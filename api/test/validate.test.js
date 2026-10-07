@@ -99,6 +99,18 @@ test('a plan that ignores the requested number of training days is rejected', ()
   assert.ok(r.errors.some(e => e.includes('4 days') && e.includes('3')));
 });
 
+test('a created plan may say how long it runs; a block that cannot be read is left out, never an error', () => {
+  const plan = block => validatePlan({ routines: [{ id: 'r1', name: 'A', ex: [{ id: '0001', sets: 3, reps: 10 }] }], week: { 1: 'r1' }, block });
+  assert.deepEqual(plan({ weeks: 8, outline: 'Six weeks up, one easy, one to test.', phases: [1, 2] }).bundle.block, { weeks: 8, outline: 'Six weeks up, one easy, one to test.' });
+  assert.deepEqual(plan({ weeks: 6 }).bundle.block, { weeks: 6 });
+  assert.equal(plan({ weeks: 4, outline: 'x'.repeat(5000) }).bundle.block.outline.length, 600);
+  for (const block of [undefined, null, 'eight weeks', [], {}, { weeks: 0 }, { weeks: 27 }, { weeks: '8' }, { weeks: 2.5 }, { outline: 'no length' }]) {
+    const r = plan(block);
+    assert.equal(r.ok, true, JSON.stringify(block));
+    assert.equal('block' in r.bundle, false, JSON.stringify(block));
+  }
+});
+
 test('an unknown progression policy is rejected', () => {
   const r = validatePlan({ routines: [{ name: 'A', prog: 'vibes', ex: [{ id: '0001', sets: 3, reps: 10 }] }] });
   assert.equal(r.ok, false);

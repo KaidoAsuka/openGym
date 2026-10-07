@@ -202,6 +202,14 @@ export function validatePlan(data, ctx = {}) {
     errors.push(`the week schedules ${Object.keys(week).length} days but ${want} were asked for`);
   }
 
+  // The block the plan is meant to run in: a number of weeks and a few lines on what they are
+  // for. It changes nothing in the plan itself (the phone keeps it as the charter's block when
+  // the plan is taken), so one that cannot be read is left out rather than failing a good plan
+  // over it. The cap is payload.js's BLOCK_WEEKS_MAX.
+  const block = data.block && typeof data.block === 'object' && isInt(data.block.weeks, 1, 26)
+    ? { weeks: data.block.weeks, ...(isStr(data.block.outline) ? { outline: clampStr(data.block.outline, 600) } : {}) }
+    : null;
+
   if (errors.length) return fail(errors);
   return {
     ok: true,
@@ -210,6 +218,7 @@ export function validatePlan(data, ctx = {}) {
       name: clampStr(data.name || 'Coach plan', 40),
       summary: clampStr(data.summary || '', 1200),
       basedOn: clampStr(data.basedOn || '', 400),
+      ...(block ? { block } : {}),
       week, routines, customEx
     }
   };

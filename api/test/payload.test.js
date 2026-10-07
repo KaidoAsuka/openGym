@@ -288,6 +288,47 @@ test('debriefs written about sessions in the window travel on a review, one per 
   for (const kind of ['create', 'debrief']) assert.equal('debriefs' in payload.build(S, { handle: handleFor('u1'), kind }), false);
 });
 
+/* ---------- the charter ---------- */
+test('the charter travels on every task, with the exercise named and the block placed on the calendar', () => {
+  const DAYS = n => new Date(Date.now() + n * DAY).toISOString().slice(0, 10);
+  const S = sampleState({ customEx: [{ id: 'cx1', n: 'Sandbag carry', bp: 'back' }] });
+  S.coach.charter = {
+    goal: '  Bench 100 kg by spring  ', updatedAt: 123, secret: 'not a field',
+    targets: [{ id: '0025', weight: 100, reps: 1, note: 'x' }, { id: 'cx1', weight: '60', reps: 0 }, { id: '0001', weight: 0, reps: 5 }, 'x', null],
+    blockWeeks: 8, startedAt: DAYS(-15), checkpoint: DAYS(41), outline: 'Six weeks up, one easy, one to test.'
+  };
+  for (const kind of ['create', 'review', 'debrief']) {
+    const p = payload.build(S, { handle: handleFor('u1'), kind });
+    assert.deepEqual(p.charter, {
+      goal: 'Bench 100 kg by spring',
+      targets: [{ id: '0025', name: payload.libraryName('0025'), weight: 100, reps: 1 }, { id: 'cx1', name: 'Sandbag carry', weight: '60', reps: 1 }],
+      blockWeeks: 8, startedAt: DAYS(-15), checkpoint: DAYS(41),
+      week: 3, checkpointDue: false,
+      outline: 'Six weeks up, one easy, one to test.'
+    }, kind);
+  }
+  S.coach.charter.checkpoint = DAYS(0);
+  assert.equal(payload.build(S, { handle: handleFor('u1'), kind: 'review' }).charter.checkpointDue, true, 'the checkpoint day itself is due');
+});
+
+test('no charter, an empty one and one of the wrong shape all read as absent', () => {
+  for (const charter of [undefined, null, 'eight weeks', [], {}, { goal: '   ', targets: [], blockWeeks: 0, startedAt: 'soon', outline: 7 }]) {
+    const S = sampleState();
+    S.coach.charter = charter;
+    assert.equal('charter' in payload.build(S, { handle: handleFor('u1'), kind: 'review' }), false, JSON.stringify(charter));
+  }
+});
+
+test('where today falls in a block is worked out for the model, and only from real dates', () => {
+  const c = { startedAt: '2026-10-07', checkpoint: '2026-12-02' };
+  assert.deepEqual(payload.charterProgress(c, '2026-10-07'), { week: 1, checkpointDue: false });
+  assert.deepEqual(payload.charterProgress(c, '2026-10-14'), { week: 2, checkpointDue: false });
+  assert.deepEqual(payload.charterProgress(c, '2026-12-02'), { week: 9, checkpointDue: true });
+  assert.deepEqual(payload.charterProgress(c, '2026-10-01'), { checkpointDue: false }, 'a block that has not begun has no week');
+  assert.deepEqual(payload.charterProgress({ startedAt: '2026-13-45', checkpoint: 'x' }, '2026-10-07'), {});
+  assert.deepEqual(payload.charterProgress(null, '2026-10-07'), {});
+});
+
 /* ---------- debriefs and the cohort ---------- */
 const debriefState = () => sampleState({
   workouts: [

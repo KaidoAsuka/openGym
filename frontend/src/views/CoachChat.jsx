@@ -18,7 +18,7 @@ import { closeThenNav } from '../lib/nav.js'
 import { useStore } from '../store/useStore.js'
 import { useUI } from '../store/useUI.js'
 import { t, tn } from '../lib/i18n.js'
-import { fmtDate, fmtNum, DAYS, weekOrder, weekStartOf } from '../lib/format.js'
+import { fmtDate, fmtNum, DAYS, weekOrder, weekStartOf, todayISO } from '../lib/format.js'
 import { exLine } from '../lib/history.js'
 import { speedUnitOf } from '../lib/speed.js'
 import { DEMO } from '../lib/demo.js'
@@ -29,6 +29,8 @@ import {
   changeTitle, changeValues, exName, canRevert, revertLast
 } from '../lib/coach.js'
 import { insightsFor, sessionInsights } from '../lib/coach-insights.js'
+import { charterLine, addDays } from '../lib/coach-charter.js'
+import CharterSheet from './CoachCharter.jsx'
 import { useCoachStatus, requestReview, requestDebrief, requestPlan, refinePlan, resolvePending, cohortStats, setCohortShare, jobErrorText, awaitedJob, settleAwaited, JOB_ERRORS } from '../lib/coach-api.js'
 import { confirmSheet } from '../sheets.jsx'
 import Icon from '../components/Icon.jsx'
@@ -163,6 +165,7 @@ export default function CoachChat() {
       <Row icon="history" iconTint="var(--blue)" title={t('Everything the Coach proposed')} subtitle={t('Plans, suggestions and debriefs, kept')} accessory="chevron" onClick={() => { close(); showHistory() }} />
       {idle && <Row icon="clipboard" iconTint="var(--indigo)" title={t('Start a new plan')} subtitle={t('A fresh plan from your answers; your workouts stay')} accessory="chevron" onClick={() => { close(); askNewPlan() }} />}
       <Row icon="pencil" iconTint="var(--indigo)" title={t('Edit my answers')} subtitle={t('Goal, days, equipment, limits')} accessory="chevron" onClick={() => closeThenNav(close, '/coach/intake?edit=1')} />
+      <Row icon="target" iconTint="var(--red)" title={t('Goal & checkpoint')} subtitle={charterLine(coach.charter)} accessory="chevron" onClick={() => { close(); openSheet(done => <CharterSheet close={done} />) }} />
       <Row icon="clock" iconTint="var(--purple)" title={t('Automatic reviews')} subtitle={cadenceLabel(coach)} accessory="chevron" onClick={() => { close(); cadenceSheet(openSheet, update) }} />
       {canRevert(S) && <Row icon="reset" iconTint="var(--blue)" title={t('Undo the last Coach changes')} accessory="chevron" onClick={() => { close(); doRevert() }} />}
     </div>
@@ -335,6 +338,10 @@ function PlanCard({ p, S, update, toast, nav, refresh }) {
         <h2 className="pcard-h">{b.name || t('Coach plan')}</h2>
         {!!b.summary && <p className="pcard-sum">{b.summary}</p>}
         {!!b.basedOn && <p className="pcard-sum" style={{ fontSize: 13 }}>{b.basedOn}</p>}
+        {!!b.block?.weeks && <p className="pcard-sum" style={{ fontSize: 13 }}>
+          <b>{t('{0}-week block · checkpoint {1}', b.block.weeks, fmtDate(addDays(todayISO(), b.block.weeks * 7)))}</b>
+          {b.block.outline ? ' — ' + b.block.outline : ''}
+        </p>}
       </div>
 
       <WeekStrip days={weekDays} ws={weekStartOf(S)} />

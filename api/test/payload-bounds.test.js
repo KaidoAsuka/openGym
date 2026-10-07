@@ -141,6 +141,26 @@ test('the accepted changes and the kept debriefs come out of the same client-wri
   assert.ok(d.watch.length <= payload.DEBRIEF_ITEMS && d.watch.every(x => x.length <= payload.DEBRIEF_ITEM_CHARS));
 });
 
+test('the charter is typed into the same state, and is cut the same, on every task', () => {
+  const S = sampleState();
+  S.coach.charter = {
+    goal: HUGE, outline: HUGE, blockWeeks: 1e9, startedAt: '2026-01-05' + HUGE, checkpoint: '2026-03-02' + HUGE, note: HUGE,
+    targets: [...Array(5000)].map((_, i) => ({ id: 'e' + i + HUGE, weight: i === 0 ? HUGE : 100, reps: 1e9, why: HUGE }))
+  };
+  for (const kind of ['create', 'review', 'debrief']) {
+    const c = payload.build(S, { handle: 'h'.repeat(16), kind }).charter;
+    assert.ok(JSON.stringify(c).length < 3000, kind + ': the charter stays small');
+    assert.equal(c.goal.length, payload.CHARTER_GOAL_MAX);
+    assert.equal(c.outline.length, payload.CHARTER_OUTLINE_MAX);
+    assert.equal(c.blockWeeks, payload.BLOCK_WEEKS_MAX);
+    assert.equal(c.startedAt, '2026-01-05');
+    assert.equal(c.checkpoint, '2026-03-02');
+    assert.equal(c.targets.length, payload.CHARTER_TARGETS_MAX);
+    assert.ok(c.targets.every(t => t.id.length <= payload.ID_MAX && t.reps === 100 && t.weight === 100), 'a weight that is not a number is no target');
+    assert.deepEqual(Object.keys(c).sort(), ['blockWeeks', 'checkpoint', 'checkpointDue', 'goal', 'outline', 'startedAt', 'targets', 'week']);
+  }
+});
+
 // The server's limits are the screen's limits. If someone lengthens a field on the intake
 // screen, this says the payload would now cut what the person was allowed to type.
 test('the limits match the intake screen', () => {

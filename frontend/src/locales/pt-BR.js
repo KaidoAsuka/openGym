@@ -1212,6 +1212,23 @@ export const PT_BR_OVERRIDES = {
   'Greys show lighter in dark mode, so buttons don’t look switched off.': 'Os cinzas ficam mais claros no modo escuro, para os botões não parecerem desligados.',
   'Greys show darker in light mode, so buttons don’t look switched off.': 'Os cinzas ficam mais escuros no modo claro, para os botões não parecerem desligados.',
   'Signed in from another tab. Your workout came along, keep going here.': 'Login feito em outra aba. Seu treino veio junto, continue por aqui.',
+  'Goal & checkpoint': 'Objetivo e ponto de controle',
+  'What you are working toward, and when to take stock': 'Para onde você está indo e quando fazer um balanço',
+  'Week {0} of {1} · checkpoint {2}': 'Semana {0} de {1} · ponto de controle {2}',
+  'Checkpoint reached — ask for a review': 'Ponto de controle atingido — peça uma revisão',
+  'What are you working toward?': 'Qual é o seu objetivo?',
+  'In your own words. The Coach reads this with every plan and every review.': 'Com suas próprias palavras. O Treinador lê isto em cada plano e em cada revisão.',
+  'e.g. “squat 140 kg by spring without gaining weight”': 'ex.: “agachamento com 140 kg até a primavera sem ganhar peso”',
+  'Target lifts': 'Exercícios-alvo',
+  'A weight and a rep count for the lifts that matter most, chosen from your plan.': 'Um peso e um número de repetições para os exercícios que mais importam, escolhidos do seu plano.',
+  'Add a target lift': 'Adicionar um exercício-alvo',
+  'This block': 'Este bloco',
+  'At the checkpoint the Coach looks at the whole block, not just the last few sessions.': 'No ponto de controle, o Treinador olha para o bloco inteiro, não apenas para as últimas sessões.',
+  'Block length': 'Duração do bloco',
+  '{0} weeks': '{0} semanas',
+  'Next checkpoint': 'Próximo ponto de controle',
+  'How the Coach laid out this block': 'Como o Treinador organizou este bloco',
+  '{0}-week block · checkpoint {1}': 'Bloco de {0} semanas · ponto de controle {1}',
 }
 
 export default { ...pt, ...PT_BR_OVERRIDES }

@@ -238,7 +238,7 @@ renders from, so the screen cannot drift from the payload — are:
 | `plan` | routines, exercises, sets/reps, schedule, progression settings |
 | `training` | logged sets, targets, effort ratings, durations, PRs and session notes in the review window |
 | `bodyweight` | weigh-ins in the window and your goal weight |
-| `profile` | the intake answers you gave the Coach, including any limitations |
+| `profile` | the intake answers you gave the Coach, including any limitations, and what you set under *Goal & checkpoint* (your goal in your own words, target lifts, the block's length and dates) |
 | `cohort` (optional) | only with comparison on and your own opt-in: anonymous medians from the other people sharing — never their data, and never yours to them beyond the same medians |
 | `prefs` | unit, language, effort scale |
 

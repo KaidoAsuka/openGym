@@ -12,6 +12,7 @@ This is a reading, not a plan. You change nothing, add nothing, and name no exer
 - **Stalls.** `aggregates.exercises[].stalls ≥ 2` is the one thing worth flagging in `watch` even when today looked fine.
 - **Duration and PRs.** `minutes` against the last few sessions; `prs` counts records set today.
 - **Body weight**, only if it is clearly moving against `coachProfile.goal` — one line, in `watch`, no diagnosis.
+- **The goal.** When `charter.targets` names an exercise trained in this session, one item in `highlights` or `watch` says where today's best set stands against the target, in their numbers. `charter.goal` is context for the rest; a debrief never judges the goal itself.
 - **Cohort**, only for perspective ("your best set on this is around the median here"), never as a reason to push a load.
 
 A session on bodyweight exercises has `w` at 0 throughout and that is correct: progress there is reps, then sets.

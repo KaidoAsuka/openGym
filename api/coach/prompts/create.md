@@ -1,6 +1,6 @@
 # Task: build a weekly training plan
 
-Design a complete plan from `coachProfile` (their intake answers) and, if present, `history` (what they have already been lifting).
+Design a complete plan from `coachProfile` (their intake answers) and, if present, `charter` (what they are training toward) and `history` (what they have already been lifting).
 
 ## Constraints
 
@@ -9,6 +9,7 @@ Design a complete plan from `coachProfile` (their intake answers) and, if presen
 - Only exercises from `library`. Respect `equipment`, `limitations`, and `dislikes` — a plan someone will not do is a plan that failed.
 - If `history.workingWeights` is present, any starting `weight` you set must be at or below what they have already handled for that exercise. For anything they have not trained, omit `weight` entirely — the app's first session sets the baseline.
 - 1–7 routines, each 3–12 exercises, compound work before accessories.
+- When `charter.goal` or `charter.targets` is present, build the plan for it: the target lifts are in the plan and trained first, and `summary` says how the plan serves the goal. If a target is not realistic inside one block, say what this block is expected to reach instead. Do not promise a number.
 
 ## Output
 
@@ -19,6 +20,7 @@ Design a complete plan from `coachProfile` (their intake answers) and, if presen
   "name": "<short plan name>",
   "summary": "<2-4 sentences: the shape of the plan and why it fits what they asked for>",
   "basedOn": "<what you used — e.g. 'your last 12 weeks' or 'no history yet'>",
+  "block": { "weeks": 8, "outline": "<2-4 short sentences: what these weeks build toward, where an easier week falls if you plan one, and what will be looked at when the block ends>" },
   "week": { "1": "r1", "3": "r2", "5": "r3" },
   "routines": [
     {
@@ -50,4 +52,5 @@ Design a complete plan from `coachProfile` (their intake answers) and, if presen
 - `mode` is `reps` (use `reps`), `time` (use `sec`), or `cardio` (use `min` and `speed`).
 - `prog` on a routine is its default; on an exercise it overrides. `inc` is the load step in `meta.unit`; `repsMin` only matters for `double`.
 - `sg`: give two exercises the same short string to superset them. They must be adjacent in the list.
+- `block` says how long this plan is meant to run before it is looked at as a whole. Use `charter.blockWeeks` when it is given; otherwise choose 4–12 weeks from their goal and experience — shorter for someone new or coming back, longer for someone training steadily. `outline` is a statement of intent, not a schedule the app runs: the app trains the same week until the plan is changed, and the progression engine sets every load (rule 4). So no week-by-week weights or percentages, and no phases the plan itself does not contain.
 - `customEx` stays empty unless the library genuinely lacks something the plan needs; then add `{ "id": "cx1", "n": "<name>", "bp": "<body part>", "desc": "<how to do it>" }` and reference `cx1` from a routine.

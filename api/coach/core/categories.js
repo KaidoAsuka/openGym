@@ -8,6 +8,6 @@ export const DATA_CATEGORIES = Object.freeze([
   'plan',        // routines, exercises, sets/reps, schedule, progression settings
   'training',    // logged sets, targets, effort ratings, durations, PRs, session notes in the review window
   'bodyweight',  // weigh-ins in the window and your goal weight
-  'profile',     // the intake answers you gave the Coach, including any limitations
+  'profile',     // the intake answers you gave the Coach, including any limitations, and the goal and checkpoint you set
   'prefs'        // unit, language, effort scale
 ]);

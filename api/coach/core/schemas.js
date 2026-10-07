@@ -71,6 +71,9 @@ export const CREATE_SCHEMA = {
     name: STR,
     summary: STR,
     basedOn: STR,
+    // How long the plan runs before it is looked at whole, and what those weeks are for. Flat,
+    // and optional: a plan without one is still a plan.
+    block: { type: 'object', properties: { weeks: { type: 'integer' }, outline: STR } },
     week: { type: 'object' },
     // The caps are the validator's own (MAX_ROUTINES, MAX_EX_PER_ROUTINE), stated here as well
     // because "1-7 routines, each 3-12 exercises" in create.md is only a request. A small model

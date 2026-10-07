@@ -473,6 +473,12 @@ export const DEBRIEF_SUMMARY_CHARS = 300;
 // A reorder lists a routine's exercises, and the validator lets a routine hold twenty.
 const CHANGE_LIST_MAX = 20;
 
+// A name for an exercise id: the catalogue's, or the person's own for one they made.
+const exNamer = S => {
+  const custom = new Map(list(S.customEx).filter(c => c && typeof c === 'object').map(c => [c.id, c.n]));
+  return id => libraryName(id) || word(custom.get(id), NAME_MAX);
+};
+
 // The log stamps an entry with Date.now(); the model reads days.
 const stamp = at => {
   const d = new Date(typeof at === 'number' ? at : typeof at === 'string' ? Date.parse(at) : NaN);
@@ -504,8 +510,7 @@ function recentChanges(S, coach) {
   // Undoing a change-set logs a `revert` naming the proposal it took back (coach.js revertLast).
   const undone = new Set(log.filter(e => e.kind === 'revert' && e.proposalId != null).map(e => e.proposalId));
   const routines = new Map(list(S.routines).filter(r => r && typeof r === 'object').map(r => [r.id, r.name]));
-  const custom = new Map(list(S.customEx).filter(c => c && typeof c === 'object').map(c => [c.id, c.n]));
-  const nameOf = id => libraryName(id) || word(custom.get(id), NAME_MAX);
+  const nameOf = exNamer(S);
   const out = [];
   for (const e of log) {
     if (e.dismissed) continue;
@@ -567,6 +572,66 @@ function pastDebriefs(coach, from) {
   return out.reverse();
 }
 
+/* ---------- the charter: what the plan is for, and when it is looked at whole ----------
+   The intake has one goal word. The charter (frontend/src/lib/coach-charter.js) is what the
+   person wrote beyond it — a goal in their own words, lifts they want to reach — and the block
+   the current plan runs in: its length, the day it started, the next checkpoint, and how the
+   Coach laid it out when the plan was made. It is typed into the same client-written state as
+   the profile and is read the same way.
+
+   The limits are the ones the charter sheet shows; coach-charter.test.js pins the two files
+   together, as coach.test.js does for the plan fingerprint. */
+export const CHARTER_GOAL_MAX = 300;
+export const CHARTER_OUTLINE_MAX = 600;
+export const CHARTER_TARGETS_MAX = 5;
+export const BLOCK_WEEKS_MAX = 26;
+
+// Whole days from one ISO day to another, counted at noon UTC so no clock change can bend it.
+const daysApart = (a, b) => Math.round((Date.parse(b + 'T12:00:00Z') - Date.parse(a + 'T12:00:00Z')) / 86400000);
+
+/**
+ * Where `today` falls in the block: the week it is in, and whether the checkpoint has come.
+ * Worked out here rather than left to the model, which is not to be trusted with a calendar.
+ * frontend/src/lib/coach-charter.js charterStatus shows the same two facts on the phone.
+ */
+export function charterProgress(charter, today) {
+  const start = day(charter?.startedAt);
+  const end = day(charter?.checkpoint);
+  const now = day(today);
+  const o = {};
+  if (start && now) {
+    const n = daysApart(start, now);
+    if (Number.isFinite(n) && n >= 0) o.week = Math.floor(n / 7) + 1;
+  }
+  if (end && now) {
+    const left = daysApart(now, end);
+    if (Number.isFinite(left)) o.checkpointDue = left <= 0;
+  }
+  return o;
+}
+
+function cleanCharter(S, coach, today) {
+  const c = coach.charter;
+  if (!c || typeof c !== 'object') return null;
+  const nameOf = exNamer(S);
+  const o = {};
+  const goal = text(c.goal, CHARTER_GOAL_MAX).trim();
+  if (goal) o.goal = goal;
+  const targets = list(c.targets)
+    .filter(t => t && typeof t === 'object' && t.id != null && num(t.weight) !== undefined && Number(t.weight) > 0)
+    .slice(0, CHARTER_TARGETS_MAX)
+    .map(t => ({ id: ident(t.id), name: nameOf(t.id), weight: t.weight, reps: count(t.reps, 1, 100) ?? 1 }));
+  if (targets.length) o.targets = targets;
+  const weeks = count(c.blockWeeks, 1, BLOCK_WEEKS_MAX);
+  if (weeks) o.blockWeeks = weeks;
+  if (day(c.startedAt)) o.startedAt = day(c.startedAt);
+  if (day(c.checkpoint)) o.checkpoint = day(c.checkpoint);
+  Object.assign(o, charterProgress(o, today));
+  const outline = text(c.outline, CHARTER_OUTLINE_MAX).trim();
+  if (outline) o.outline = outline;
+  return Object.keys(o).length ? o : null;
+}
+
 /**
  * Build a job payload.
  *
@@ -598,6 +663,8 @@ export function build(S, opts = {}) {
     coachProfile: profile && typeof profile === 'object' ? cleanProfile(profile) : null,
     plan: cleanPlan(S)
   };
+  const charter = cleanCharter(S, coach, p.meta.today);
+  if (charter) p.charter = charter;
 
   // What the user already turned down, so the Coach does not re-propose it without new
   // evidence (FR-26). Summaries only — the log's full before/after stays on the device.

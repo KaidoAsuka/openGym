@@ -38,6 +38,10 @@ const CLIENT_APP = `opengym-coach/${(() => {
   try { return require_('../../package.json').version; } catch { return '0' }
 })()}`;
 const OUTPUT_CAP = 4 * 1024 * 1024;
+// How hard the model thinks — the SDK's `effort` option. Unset leaves the runtime's own default,
+// which is what every instance got before this knob existed.
+const EFFORT = ['low', 'medium', 'high', 'xhigh', 'max'].includes(process.env.COACH_CLAUDE_EFFORT)
+  ? process.env.COACH_CLAUDE_EFFORT : null;
 
 /** The options that make this adapter safe. Exported so a test can assert them by value. */
 export const LOCKDOWN = Object.freeze({
@@ -112,6 +116,7 @@ export default {
           // and the VAPID keys cannot reach the model process by inheritance.
           env: { ...env, CLAUDE_AGENT_SDK_CLIENT_APP: CLIENT_APP },
           model: model || undefined,
+          ...(EFFORT ? { effort: EFFORT } : {}),
           systemPrompt: SYSTEM_PROMPT,
           stderr: data => { if (stderr.length < OUTPUT_CAP) stderr += data; },
           spawnClaudeCodeProcess: spawnAsCoach

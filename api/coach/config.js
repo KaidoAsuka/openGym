@@ -321,6 +321,28 @@ export function publicConfig() {
   return { enabled: true, provider: cfg.provider, providerLabel: providerMeta(cfg).label, authMode: cfg.authMode, community: !!cfg.community };
 }
 
+/* A Windows development host — the API started with `node`, not inside the Linux image. The
+   PATH below means nothing there, and a process started without SystemRoot cannot open a
+   socket, so a spawned runtime never gets as far as the provider. Opt-in through
+   COACH_DEV_HOST_ENV, so the container's environment (and the tests that pin its exact keys)
+   is untouched. Still built from nothing: only what Windows itself needs is copied by name, and
+   every per-user location points into the job directory. */
+const DEV_HOST_ENV = process.platform === 'win32' && /^(1|true|yes|on)$/i.test(process.env.COACH_DEV_HOST_ENV || '');
+function windowsHostEnv(jobDir) {
+  const root = process.env.SystemRoot || 'C:\\Windows';
+  const env = {
+    SystemRoot: root, windir: root, SystemDrive: process.env.SystemDrive || 'C:',
+    ComSpec: process.env.ComSpec || path.join(root, 'System32', 'cmd.exe'),
+    PATHEXT: '.COM;.EXE;.BAT;.CMD',
+    PATH: [path.join(root, 'System32'), root].join(';'),
+    USERPROFILE: jobDir, HOME: jobDir, TEMP: jobDir, TMP: jobDir, TMPDIR: jobDir,
+    APPDATA: path.join(jobDir, 'AppData', 'Roaming'), LOCALAPPDATA: path.join(jobDir, 'AppData', 'Local')
+  };
+  // Claude Code on Windows looks for Git Bash at start-up; name it rather than widen PATH.
+  if (process.env.CLAUDE_CODE_GIT_BASH_PATH) env.CLAUDE_CODE_GIT_BASH_PATH = process.env.CLAUDE_CODE_GIT_BASH_PATH;
+  return env;
+}
+
 /**
  * The environment a job's provider process gets. Deliberately built from nothing rather than
  * filtered from process.env: the child must not inherit RP_ID, ADMIN_UIDS, VAPID material or
@@ -330,7 +352,8 @@ export function publicConfig() {
 export function jobEnv(jobDir, resolved) {
   const cfg = load();
   const meta = providerMeta(cfg);
-  const env = { PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin', HOME: jobDir, TMPDIR: jobDir };
+  const env = DEV_HOST_ENV ? windowsHostEnv(jobDir)
+    : { PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin', HOME: jobDir, TMPDIR: jobDir };
   const auth = resolved && resolved.auth;
   if (auth && auth.token) {
     const name = (resolved.type === 'cli-token' || resolved.type === 'oauth') ? meta.oauthEnv

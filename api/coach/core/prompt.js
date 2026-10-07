@@ -9,14 +9,16 @@ export const taskOf = (kind, payload) =>
 /**
  * The prompt in two parts: `system` is the rules — byte-identical for every job of the same
  * task, deliberately free of anything user- or day-specific — and `user` is the payload (and,
- * on the one repair round, the previous answer with its errors). The split is what lets a
+ * on the one repair round, the previous answer with its errors). The rules are three texts:
+ * how to read the data and answer (common), the training principles every task coaches by
+ * (principles), and the task. The first two are the same for every task. The split is what lets a
  * local llama.cpp/Ollama server reuse its KV prefix cache across jobs: only the payload is
  * re-processed, which on a CPU box is most of the wall time. Cloud providers get the same
  * split as system/user messages (and Anthropic caches the system block explicitly).
  */
 export function buildPromptParts(kind, payload, repair) {
   const task = taskOf(kind, payload);
-  const system = PROMPTS.common + '\n\n---\n\n' + PROMPTS[task];
+  const system = PROMPTS.common + '\n\n---\n\n' + PROMPTS.principles + '\n\n---\n\n' + PROMPTS[task];
   // Compact JSON, not pretty-printed: the indentation was ~30% of the payload's tokens and
   // a model reads either just as well.
   let user = '## Payload\n\n```json\n' + JSON.stringify(payload) + '\n```\n';

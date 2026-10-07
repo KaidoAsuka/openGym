@@ -331,6 +331,31 @@ you that has not:
 - **hit something that exists.** Every target names a routine in your plan, and anything about
   an exercise names one that is actually in that routine.
 - **cited its evidence.** A change with no `why` is refused.
+- **stayed inside two counted limits.** The work sets a body part gets in a week, and the minutes
+  a training day comes to against the session length you gave in the intake. See below.
+
+**Training principles, and the two that are arithmetic.** Every task's system prompt carries
+`api/coach/prompts/principles.md` between the reading rules and the task: what wins when rules
+pull apart, how much work and how hard, strength work, progression, stalls, easier weeks, how to
+treat what you tell it, and safety. Each rule has a number (V1, M3, …) the Coach may put in
+brackets after a reason, and the sources it rests on. Most of it is judgement and stays advice.
+Two rules are sums, and `api/coach/core/plan-load.js` does them rather than the model:
+
+- **V2, weekly sets by body part.** Every planned set counts once toward the body part of its
+  exercise, over the week as scheduled. The ceilings are 20 for chest, shoulders, lower legs,
+  waist, lower arms and neck, 30 for back and for upper arms, 40 for upper legs. The research
+  states its range per muscle with half-credit for synergists; the count here is by body part
+  because that is the one field every exercise in the payload carries, and because the
+  catalogue's muscle data, counted that way, reads an ordinary six-day split as far over.
+- **V6, session length.** A training day is estimated at 2.5 minutes per straight set, 1.5 per
+  set in a superset, a hold as its seconds plus a minute, cardio as its minutes. It may not come
+  to more than the session length from the intake. With no session length, nothing is held.
+
+A new plan over either limit is refused. A review is refused only for what its own changes made
+worse: a plan you edited past a limit by hand does not block later proposals, and a change that
+brings a body part or a day down is always allowed. A review's payload carries the plan already
+counted (`planLoad`), so the model starts from the app's numbers. There is no floor: a plan that
+leaves a body part out is yours to ask for.
 
 A rejected answer gets **one** repair round, with the errors handed back verbatim. Two failures
 is a provider problem rather than a prompting problem, and a retry loop against a paid account

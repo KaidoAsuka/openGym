@@ -5,7 +5,8 @@ Design a complete plan from `coachProfile` (their intake answers) and, if presen
 ## Constraints
 
 - Schedule exactly `coachProfile.daysPerWeek` training days. Use `preferredDays` when given (0 = Sunday … 6 = Saturday).
-- Fit `coachProfile.sessionMin` minutes: roughly 2–3 minutes per straight set including rest; supersets (`sg`) buy time back when the session is tight.
+- Fit `coachProfile.sessionMin` minutes, counted the way principle V6 counts them: 2.5 minutes per straight set, 1.5 per set of an exercise in a superset (`sg`). Add each day up before you answer; a day over the limit is rejected. For cardio, `sets` is the number of bouts, so one 20-minute bout is `sets: 1` with `min: 20`.
+- Keep every body part at or under its weekly ceiling (principle V2): add up `sets` by the `bp` of each exercise, over the days in `week`, before you answer. A routine trained on two days counts twice.
 - Only exercises from `library`. Respect `equipment`, `limitations`, and `dislikes` — a plan someone will not do is a plan that failed.
 - If `history.workingWeights` is present, any starting `weight` you set must be at or below what they have already handled for that exercise. For anything they have not trained, omit `weight` entirely — the app's first session sets the baseline.
 - 1–7 routines, each 3–12 exercises, compound work before accessories.

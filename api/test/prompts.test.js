@@ -39,6 +39,11 @@ test('buildPrompt picks the task by kind and refine, and only adds the repair bl
   const refine = buildPrompt('create', { ...payload, refine: { text: 'x' } }, null);
   assert.ok(refine.includes(PROMPTS.refine) && !refine.includes(PROMPTS.create));
 
+  // The training principles ride on every task, after the reading rules and ahead of the task.
+  for (const [prompt, task] of [[review, 'review'], [debrief, 'debrief'], [digest, 'digest'], [create, 'create'], [refine, 'refine']]) {
+    assert.ok(prompt.startsWith(PROMPTS.common + '\n\n---\n\n' + PROMPTS.principles + '\n\n---\n\n' + PROMPTS[task]), task);
+  }
+
   const repaired = buildPrompt('review', payload, { previous: '{"bad": true}', errors: ['first', 'second'] });
   assert.ok(repaired.includes('{"bad": true}'));
   assert.ok(repaired.includes('- first\n- second'));

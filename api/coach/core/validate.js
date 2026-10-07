@@ -16,6 +16,7 @@
  */
 import { libraryHas, libraryName } from './library.js';
 import { glyphStr } from './glyphs.js';
+import { planLoadErrors, changeLoadErrors, customBodyParts } from './plan-load.js';
 
 // The closed list (FR-23 / C3). Adding a member here is a deliberate act with an apply
 // implementation on the client to match; there is no default case anywhere.
@@ -68,6 +69,14 @@ const ODD_PER_SIDE = where =>
   `${where} is a per-side exercise, so reps are the total across both sides and must be an even number`;
 const INVERTED_RANGE = where =>
   `${where} sets a rep ceiling below its own floor — repsMax must be at least repsMin`;
+
+/* ---------- the two limits of prompts/principles.md, enforced the same way ----------
+   Most of that file is judgement too. Two of its rules are arithmetic: the work sets a body
+   part gets in a week (V2) and the minutes a training day comes to against the session length
+   the person gave (V6). plan-load.js does the counting; a plan or a set of changes over either
+   limit goes back for the repair round with the count, the limit and where the sets come from.
+   For a review only what the changes themselves made worse is an error — a plan its owner
+   edited past a limit by hand does not make every later proposal unusable. */
 
 /* =============================== created plans =============================== */
 
@@ -201,6 +210,13 @@ export function validatePlan(data, ctx = {}) {
   if (isInt(want, 1, 7) && Object.keys(week).length !== want) {
     errors.push(`the week schedules ${Object.keys(week).length} days but ${want} were asked for`);
   }
+
+  // V2 and V6: the week this plan schedules, counted. Checked beside whatever else is wrong, so
+  // the one repair round hears about all of it.
+  errors.push(...planLoadErrors({ routines, week }, {
+    sessionMin: ctx.sessionMin,
+    custom: new Map([...(ctx.custom || []), ...customBodyParts(customEx)])
+  }));
 
   // The block the plan is meant to run in: a number of weeks and a few lines on what they are
   // for. It changes nothing in the plan itself (the phone keeps it as the charter's block when
@@ -545,6 +561,9 @@ export function validateReview(data, plan, ctx = {}) {
   if (routines.size + addedRoutines - removedRoutines.size > MAX_ROUTINES) {
     errors.push(`the plan would end up with more than the ${MAX_ROUTINES} routines allowed`);
   }
+
+  // V2 and V6: what the changes add up to, once they are all applied.
+  errors.push(...changeLoadErrors(plan, kept, { sessionMin: ctx.sessionMin, custom: ctx.custom }));
 
   if (errors.length) return fail([...errors, ...dropped]);
 

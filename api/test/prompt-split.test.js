@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildPrompt, buildPromptParts, taskOf } from '../coach/core/prompt.js';
+import { PROMPTS } from '../coach/core/prompts.js';
 import { SCHEMAS } from '../coach/core/schemas.js';
 import { build, FULL_DETAIL_SESSIONS } from '../coach/core/payload.js';
 import { chatCompletionsSpec } from '../coach/core/adapters/openai.js';
@@ -23,6 +24,18 @@ test('the rules half of the prompt is byte-identical across jobs of the same tas
   assert.notEqual(a.user, b.user);
   assert.ok(a.user.includes('## Payload'));
   assert.ok(!a.system.includes('Payload'));      // nothing dynamic ahead of the payload
+});
+
+test('every task opens with the same reading rules and training principles, so that much is one shared prefix', () => {
+  const p = build(S([workout('2026-08-01')]), { handle: 'h1', kind: 'review' });
+  const shared = PROMPTS.common + '\n\n---\n\n' + PROMPTS.principles + '\n\n---\n\n';
+  for (const [kind, payload] of [['review', p], ['debrief', p], ['digest', p], ['create', p], ['create', { ...p, refine: { text: 'x' } }]]) {
+    const { system, task } = buildPromptParts(kind, payload);
+    assert.ok(system.startsWith(shared), task);
+    assert.equal(system, shared + PROMPTS[task]);
+  }
+  // Rules, not data: nothing in the principles names a person, a date or a number of theirs.
+  assert.ok(!PROMPTS.principles.includes('Payload'));
 });
 
 test('a repair round changes only the user half', () => {

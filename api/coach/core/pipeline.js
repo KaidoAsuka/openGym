@@ -15,6 +15,7 @@ import { buildPrompt, buildPromptParts } from './prompt.js';
 import { SCHEMAS } from './schemas.js';
 import { extractJSON, contractOK } from './parse.js';
 import { validatePlan, validateReview, validateDebrief, validateDigest } from './validate.js';
+import { customBodyParts } from './plan-load.js';
 
 /**
  * One attempt: prompt → provider → parse → validate.
@@ -58,9 +59,13 @@ export async function attemptOnce({ adapter, cfg, kind, payload, model, timeoutM
   // time. A model that cannot be told is a failed job, not a retry loop.
   // The user's own exercises are in the library slice the model was given (flagged `custom`),
   // so they are a legitimate thing for it to name back — the validator has to agree.
-  const customIds = (payload.library || []).filter(e => e && e.custom).map(e => e.id);
+  const own = (payload.library || []).filter(e => e && e.custom);
+  const customIds = own.map(e => e.id);
+  // What the two counted limits are held against (principles V2, V6): the session length the
+  // person gave, and the body part of each exercise the catalogue does not know.
+  const limits = { sessionMin: payload.coachProfile?.sessionMin, custom: customBodyParts(own) };
   const checked = kind === 'review'
-    ? validateReview(parsed.value, payload.plan, { customIds })
+    ? validateReview(parsed.value, payload.plan, { customIds, ...limits })
     : kind === 'debrief'
       ? validateDebrief(parsed.value)
       : kind === 'digest'
@@ -68,7 +73,8 @@ export async function attemptOnce({ adapter, cfg, kind, payload, model, timeoutM
         : validatePlan(parsed.value, {
       customIds,
       workingWeights: payload.history?.workingWeights,
-      daysPerWeek: payload.coachProfile?.daysPerWeek
+      daysPerWeek: payload.coachProfile?.daysPerWeek,
+      ...limits
     });
 
   if (!checked.ok) return { ok: false, repairable: !repair, errors: checked.errors, raw: r.text, errorClass: 'unusable' };

@@ -22,5 +22,6 @@ Common causes, in the order they usually apply:
 - A `type` outside the allowed list, or a `target` naming a routine or exercise that is not in the plan.
 - A `target.exId` that belongs to a different routine than `target.routineId`. It must be one of that routine's own exercise ids.
 - A `swap-exercise` or `add-exercise` whose `after.id` is already in the target routine. Choose a different `library` id that the routine does not have yet, or drop that change — repeating it will be rejected again.
+- A body part over its weekly ceiling, or a training day over the session length (principles V2 and V6). The message says by how much and where the sets come from. Take sets out; moving them to another exercise of the same body part, or to another exercise on the same day, changes nothing.
 - A value of the wrong kind — a string where a number belongs, an object where a plain value belongs.
 - A missing `why`. Every change needs one.

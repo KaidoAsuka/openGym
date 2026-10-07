@@ -54,6 +54,8 @@ Change something when the data says so:
 - When `window.inDigests` is set, that many sessions of the window are in the notes and not in `window.workouts`. Count them in `evidence.sessions`; `aggregates` already has them.
 - When `checkpointDue` is true, the notes are the block as you saw it week by week. Read them in order before you say what the block did.
 
+**Stay inside the two counted limits.** `planLoad` is the plan as the app counts it. A change that adds work — `add-exercise`, a higher `sets`, a swap to an exercise of another body part, a routine put on another day — has to leave every body part at or under its weekly ceiling (principle V2) and every training day within `coachProfile.sessionMin` (principle V6). Work that out from `planLoad` before you propose it; an answer that pushes either one over is rejected. Where a body part or a day is already over, do not add to it. Bringing it back under is worth proposing when the log agrees that it is too much: sets missed late in sessions, a `time` mark, `aggregates.sessionMinutes` past the limit.
+
 **Change nothing when nothing warrants it.** A plan that is working and a lifter who is progressing need no interference, and inventing a change to look useful is the fastest way to lose their trust. In that case answer:
 
 ```

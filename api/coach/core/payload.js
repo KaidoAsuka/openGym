@@ -12,6 +12,7 @@
  */
 import { glyphStr } from './glyphs.js';
 import { LIBRARY, LIB_BY_ID, libraryHas, libraryName, librarySlice, isStretch, MAX_LIBRARY } from './library.js';
+import { planLoadForPayload, customBodyParts } from './plan-load.js';
 
 export const CONTRACT = 1;
 // Bounds from FR-22. A review reads a training block, not a training career: more history
@@ -974,6 +975,11 @@ export function build(S, opts = {}) {
     if (detailFrom > lines.length) p.window.inDigests = detailFrom - lines.length;
     if (written.length) p.digests = written;
     p.aggregates = aggregates(S, workouts);
+    // What the plan asks of a week, counted the way the validator will count the answer
+    // (plan-load.js): work sets by body part, and each training day's estimated minutes. Worked
+    // out from the cleaned plan above, so it holds nothing the plan does not.
+    const load = planLoadForPayload(p.plan, customBodyParts(S.customEx));
+    if (load) p.planLoad = load;
     p.bodyweight = { goal: num(S.targetW) ?? null, series: weighIns(S, p.window.from, null) };
     // Why the plan is the way it is, and what was said about the sessions in the window.
     const changed = recentChanges(S, coach);

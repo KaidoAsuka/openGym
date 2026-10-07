@@ -224,6 +224,34 @@ describe('session notes', () => {
     expect('notePin' in w.entries[0]).toBe(false)
   })
 
+  it('keeps the marks on an exercise, and writes no field when nothing was marked', () => {
+    const w = buildCompletedWorkout(active({ flags: ['heavy', 'pain', 'made up'] }))
+    expect(w.entries[0].flags).toEqual(['pain', 'heavy'])
+    expect('flags' in buildCompletedWorkout(active({ flags: [] })).entries[0]).toBe(false)
+    expect('flags' in buildCompletedWorkout(active({})).entries[0]).toBe(false)
+    expect('skipped' in w).toBe(false)
+  })
+
+  // A marked exercise with no set done drops out of the entries, and one swapped out or removed
+  // (active.skipped) was never in them. Their marks are the reason they are missing.
+  it('keeps a marked exercise that ended with nothing logged beside the entries', () => {
+    const a = active({})
+    a.entries.push({ id: '0293', sets: [{ w: 20, r: 10, done: false }], flags: ['time'], note: ' ran out ' })
+    a.entries.push({ id: '0047', sets: [{ w: 20, r: 10, done: false }] })
+    a.skipped = [{ id: '0001', flags: ['equipment'] }]
+    const w = buildCompletedWorkout(a)
+    expect(w.entries.map(e => e.id)).toEqual(['0025'])
+    expect(w.skipped).toEqual([{ id: '0001', flags: ['equipment'] }, { id: '0293', flags: ['time'], note: 'ran out' }])
+  })
+
+  it('does not call an exercise skipped that was logged after all', () => {
+    const a = active({})
+    a.skipped = [{ id: '0025', flags: ['equipment'], note: 'rack taken at first' }]
+    const w = buildCompletedWorkout(a)
+    expect('skipped' in w).toBe(false)
+    expect(w.entries[0]).toMatchObject({ flags: ['equipment'], note: 'rack taken at first' })
+  })
+
   it('keeps a whole-session note on the workout', () => {
     const a = active({})
     expect(buildCompletedWorkout({ ...a, note: 'slept badly' }).note).toBe('slept badly')

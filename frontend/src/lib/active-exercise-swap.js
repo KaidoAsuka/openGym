@@ -1,4 +1,5 @@
 import { supersetUnits, unitOf } from './history.js'
+import { keepMarked } from './exercise-flags.js'
 
 function hasLoggedSet(entry) {
   return Array.isArray(entry?.sets) && entry.sets.some(set => set?.done === true)
@@ -19,8 +20,12 @@ export function swapActiveExercise(active, index, replacement, {
 
   const current = active.entries[index]
   if (!hasLoggedSet(current)) {
+    // A mark is about the exercise it was put on — "the station was taken" is why this one is
+    // being swapped out, and says nothing about its replacement. It stays with the session under
+    // the old exercise, together with what was typed about it (lib/exercise-flags.js).
+    const marked = keepMarked(active, current)
     const metadata = Object.fromEntries(Object.entries(current).filter(([key]) => (
-      !['id', 'target', 'plan', 'planned', 'carried', 'sets', 'sg'].includes(key)
+      !['id', 'target', 'plan', 'planned', 'carried', 'sets', 'sg', 'flags', ...(marked ? ['note', 'notePin'] : [])].includes(key)
     )))
     active.entries[index] = { ...metadata, ...replacement, ...(current.sg ? { sg: current.sg } : {}) }
     active.cur = index

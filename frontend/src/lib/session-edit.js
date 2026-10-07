@@ -197,11 +197,14 @@ function draftRecord(active, current, key) {
     const merged = { ...clone(logged[i]), ...entry }
     delete merged.plan
     delete merged.carried
-    for (const k of ['note', 'notePin', 'noProg', 'muscleSnapshot', 'rid', 'planned']) if (!(k in entry)) delete merged[k]
+    for (const k of ['note', 'notePin', 'flags', 'noProg', 'muscleSnapshot', 'rid', 'planned']) if (!(k in entry)) delete merged[k]
     return merged
   })
   const record = { ...current, ...updated, id: key, d: current.d, start: current.start, end: current.end }
   if (!('excludeFromProgression' in updated)) delete record.excludeFromProgression
+  // The marked exercises the session did not log are worked out again from the draft, which
+  // opened holding the record's own: one logged in the editor after all is no longer skipped.
+  if (!('skipped' in updated)) delete record.skipped
   const base = active.editBase
   for (const k of SESSION_FIELDS) {
     // A draft from before `editBase` existed has nothing to compare with, and keeps the editor's.

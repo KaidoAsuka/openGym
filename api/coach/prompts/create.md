@@ -9,6 +9,7 @@ Design a complete plan from `coachProfile` (their intake answers) and, if presen
 - Only exercises from `library`. Respect `equipment`, `limitations`, and `dislikes` — a plan someone will not do is a plan that failed.
 - If `history.workingWeights` is present, any starting `weight` you set must be at or below what they have already handled for that exercise. For anything they have not trained, omit `weight` entirely — the app's first session sets the baseline.
 - 1–7 routines, each 3–12 exercises, compound work before accessories.
+- If `observations` is present, it is what they marked on exercises in the last twelve weeks. Leave out an exercise marked `pain`, and one marked `dislike` or `discomfort` twice or more (`times ≥ 2`), and choose something else for the same job. `equipment` twice or more means that station is often taken — prefer an alternative. Say in the `why` of the replacement what it replaces and which mark led to it.
 - When `charter.goal` or `charter.targets` is present, build the plan for it: the target lifts are in the plan and trained first, and `summary` says how the plan serves the goal. If a target is not realistic inside one block, say what this block is expected to reach instead. Do not promise a number.
 
 ## Output

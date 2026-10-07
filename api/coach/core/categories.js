@@ -6,7 +6,7 @@
  * builds from it, so the screen cannot drift from the payload. */
 export const DATA_CATEGORIES = Object.freeze([
   'plan',        // routines, exercises, sets/reps, schedule, progression settings
-  'training',    // logged sets, targets, effort ratings, durations, PRs, session notes in the review window
+  'training',    // logged sets, targets, effort ratings, durations, PRs, session notes in the review window, and the marks and notes put on exercises
   'bodyweight',  // weigh-ins in the window and your goal weight
   'profile',     // the intake answers you gave the Coach, including any limitations, and the goal and checkpoint you set
   'prefs'        // unit, language, effort scale

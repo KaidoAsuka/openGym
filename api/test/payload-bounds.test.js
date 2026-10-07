@@ -141,6 +141,52 @@ test('the accepted changes and the kept debriefs come out of the same client-wri
   assert.ok(d.watch.length <= payload.DEBRIEF_ITEMS && d.watch.every(x => x.length <= payload.DEBRIEF_ITEM_CHARS));
 });
 
+test('marks, exercise notes and skipped exercises are read by name and cut, wherever they travel', () => {
+  const ago = n => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+  const sets = [{ w: 20, r: 10, done: true }];
+  const S = sampleState();
+  S.workouts = [...Array(8)].map((_, i) => ({
+    id: 'w' + i, d: ago(8 - i) + HUGE, name: 'A', start: 1, end: 2,
+    entries: [
+      { id: '0001', sets, flags: ['heavy', HUGE, { pain: true }, ...Array(5000).fill('pain')], note: HUGE },
+      { id: 'e' + HUGE, sets, flags: HUGE, note: { text: HUGE } }
+    ],
+    skipped: [...Array(500)].map((_, j) => ({ id: 'x' + i + '_' + j + '_' + HUGE, flags: ['time', HUGE], note: HUGE, extra: HUGE }))
+      .concat(['x', null, { id: 'unmarked' }, { flags: ['pain'] }])
+  }));
+  for (const kind of ['review', 'create', 'debrief']) {
+    const p = payload.build(S, { handle: 'h'.repeat(16), kind });
+    const o = p.observations;
+    assert.ok(JSON.stringify(o).length < 20_000, kind + ': the counted marks stay small (' + JSON.stringify(o).length + ')');
+    assert.ok(o.exercises.length <= payload.OBSERVATIONS_MAX);
+    assert.equal(o.sessions, 8);
+    assert.deepEqual(Object.keys(o.byKind), ['pain', 'time', 'heavy']);
+    for (const x of o.exercises) {
+      assert.deepEqual(Object.keys(x).filter(k => !['skipped', 'notes'].includes(k)), ['id', 'name', 'flag', 'times', 'of', 'dates', 'inPlan'], 'read by name');
+      assert.ok(String(x.id).length <= payload.ID_MAX && payload.FLAG_KINDS.includes(x.flag));
+      assert.ok(x.dates.length <= payload.OBSERVATION_DATES && x.dates.every(d => d.length === 10));
+      assert.ok((x.notes || []).length <= payload.OBSERVATION_NOTES);
+      for (const n of x.notes || []) assert.ok(n.d.length === 10 && n.text.length <= payload.OBSERVATION_NOTE_CHARS);
+    }
+    assert.deepEqual(o.exercises[0], { id: '0001', name: payload.libraryName('0001'), flag: 'pain', times: 8, of: 8, dates: o.exercises[0].dates, notes: o.exercises[0].notes, inPlan: true });
+  }
+  const p = payload.build(S, { handle: 'h'.repeat(16), kind: 'review' });
+  assert.equal(p.window.workouts.length, 8);
+  for (const w of p.window.workouts) {
+    const [marked, other] = w.entries;
+    assert.deepEqual(marked.flags, ['pain', 'heavy'], 'known kinds, each once');
+    assert.equal(marked.note?.length, w.compact ? undefined : payload.ENTRY_NOTE_CHARS);
+    assert.equal('flags' in other, false, 'a mark that is not a list is no mark');
+    assert.equal('note' in other, false, 'a note that is not text is no note');
+    assert.equal(w.skipped.length, payload.SKIPPED_MAX);
+    for (const e of w.skipped) {
+      assert.deepEqual(Object.keys(e), w.compact ? ['id', 'name', 'flags'] : ['id', 'name', 'flags', 'note']);
+      assert.ok(e.id.length <= payload.ID_MAX && (e.note || '').length <= payload.ENTRY_NOTE_CHARS);
+      assert.deepEqual(e.flags, ['time']);
+    }
+  }
+});
+
 test('the charter is typed into the same state, and is cut the same, on every task', () => {
   const S = sampleState();
   S.coach.charter = {

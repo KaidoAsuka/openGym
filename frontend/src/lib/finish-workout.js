@@ -2,6 +2,7 @@
 // exercise the exact shape the UI writes without mounting React or mutating store state.
 import { bestWeightForEntry, cleanupSg } from './history.js'
 import { hasCompletedWork, isSideSet } from './workout-model.js'
+import { cleanFlags, settleMarks } from './exercise-flags.js'
 
 // planSec is live-session bookkeeping: a hold displaced before it finished puts its plan aside so
 // the row still knows what it is asking for (Workout.startTimed). A finished session keeps only
@@ -97,12 +98,19 @@ export function buildCompletedWorkout(active, { end = Date.now(), prs = [], snap
       completed.note = note
       if (entry.notePin) completed.notePin = true
     }
+    // What was marked on it (lib/exercise-flags.js), under the same rule as the note.
+    const flags = cleanFlags(entry.flags)
+    if (flags.length) completed.flags = flags
     return completed
   }).filter(entry => entry.sets.some(hasCompletedWork))
   // An exercise left without a single set drops out above, and its partner is then a superset
   // of one. cleanupSg clears the tag it no longer shares with a neighbour; the entries are this
   // function's own copies, so the running session is left alone.
   cleanupSg(entries)
+  // A marked exercise that drops out above, or left the session earlier, would take its mark
+  // with it — and "the station was taken", "no time left" and "it hurt" are marks on exactly
+  // the exercises that end with nothing logged. They are kept beside the entries instead.
+  const skipped = settleMarks(active, entries)
 
   const sessionNote = (active?.note || '').trim()
   const routineIds = [].concat(active?.routineIds ?? (active?.routineId ? [active.routineId] : []))
@@ -125,5 +133,6 @@ export function buildCompletedWorkout(active, { end = Date.now(), prs = [], snap
     prs,
     ...(allNoProg ? { excludeFromProgression: true } : {}),
     ...(sessionNote ? { note: sessionNote } : {}),
+    ...(skipped.length ? { skipped } : {}),
   }
 }

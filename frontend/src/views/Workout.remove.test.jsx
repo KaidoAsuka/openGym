@@ -114,6 +114,19 @@ describe('active-session exercise removal', () => {
     expect(active.entries[0].sets[0].sec).toBeUndefined()
   })
 
+  // Stopped for pain, dropped for time: the mark on a removed exercise is the reason it is gone,
+  // so it stays with the session (lib/exercise-flags.js) and is saved beside the entries.
+  it('leaves the mark of a removed exercise with the session, and nothing for an unmarked one', () => {
+    setActive([{ ...entry('1001'), flags: ['pain'], note: 'elbow' }, entry('1002'), entry('1003')], 0)
+
+    act(() => { removeActiveExercise(0) })
+    act(() => { removeActiveExercise(0) })
+
+    const active = useStore.getState().S.active
+    expect(active.entries.map(e => e.id)).toEqual(['1003'])
+    expect(active.skipped).toEqual([{ id: '1001', flags: ['pain'], note: 'elbow' }])
+  })
+
   it('cancels a running rest countdown when the exercise it belongs to is removed', () => {
     setActive([entry('1001'), entry('1002')], 0)
     useUI.getState().startRest(90, 0)

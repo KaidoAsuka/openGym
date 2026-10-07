@@ -1229,6 +1229,14 @@ export const PT_BR_OVERRIDES = {
   'Next checkpoint': 'Próximo ponto de controle',
   'How the Coach laid out this block': 'Como o Treinador organizou este bloco',
   '{0}-week block · checkpoint {1}': 'Bloco de {0} semanas · ponto de controle {1}',
+  'Pain': 'Dor',
+  'Uncomfortable': 'Desconfortável',
+  'Equipment taken': 'Equipamento ocupado',
+  'Out of time': 'Sem tempo',
+  'Too heavy': 'Pesado demais',
+  'Too light': 'Leve demais',
+  'Don’t like it': 'Não gosto',
+  'Marked, not done': 'Marcado, não feito',
 }
 
 export default { ...pt, ...PT_BR_OVERRIDES }

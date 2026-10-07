@@ -363,6 +363,37 @@ const targetOf = en => (en.target && typeof en.target === 'object'
   ? { sets: num(en.target.sets), reps: num(en.target.reps), sec: num(en.target.sec), weight: num(en.target.weight) }
   : null);
 
+/* ---------- what the lifter marked on an exercise ----------
+   A session's entry can carry marks (frontend/src/lib/exercise-flags.js): seven fixed words for
+   what got in the way that day, set next to the note typed about the exercise. A marked exercise
+   that ended the session without a set has no entry; the workout lists it under `skipped`
+   instead. Both come out of the client-written state, so a mark is read against the list of
+   kinds and the note is cut like every other typed text.
+
+   frontend/src/lib/exercise-flags.test.js pins the kinds to the ones the phone writes. */
+export const FLAG_KINDS = ['pain', 'discomfort', 'equipment', 'time', 'heavy', 'light', 'dislike'];
+export const ENTRY_NOTE_CHARS = 200;
+// A workout holds a handful of exercises; this is what the phone keeps at most (SKIPPED_MAX).
+export const SKIPPED_MAX = 12;
+const flagsOf = v => (Array.isArray(v) ? FLAG_KINDS.filter(k => v.includes(k)) : []);
+const noteOf = en => text(en.note, ENTRY_NOTE_CHARS).trim();
+const skippedOf = w => list(w.skipped)
+  .filter(e => e && typeof e === 'object' && e.id != null && flagsOf(e.flags).length)
+  .slice(0, SKIPPED_MAX);
+/** The marks on one entry, and with `withNote` what was typed about it; nothing when unmarked. */
+function marked(en, withNote) {
+  const o = {};
+  const flags = flagsOf(en.flags);
+  if (flags.length) o.flags = flags;
+  if (withNote && noteOf(en)) o.note = noteOf(en);
+  return o;
+}
+/** `skipped` for one workout, or no key at all. */
+function skippedPart(w, withNote) {
+  const out = skippedOf(w).map(e => ({ id: ident(e.id), name: libraryName(e.id), ...marked(e, withNote) }));
+  return out.length ? { skipped: out } : {};
+}
+
 /** One older workout as a summary: what was done, the top set, whether targets were hit. */
 function compactWorkout(w) {
   return {
@@ -384,9 +415,11 @@ function compactWorkout(w) {
         name: libraryName(en.id),
         done: done.length + '/' + sets.length,
         ...(target ? { target: fmtSet({ w: target.weight, r: target.reps, sec: target.sec }) } : {}),
-        ...(top ? { top: fmtSet(top) } : {})
+        ...(top ? { top: fmtSet(top) } : {}),
+        ...marked(en, false)
       };
-    })
+    }),
+    ...skippedPart(w, false)
   };
 }
 
@@ -403,8 +436,10 @@ function cleanWorkout(w) {
       id: ident(en.id),
       name: libraryName(en.id),
       target: targetOf(en),
-      sets: setsOf(en).map(cleanSet)
-    }))
+      sets: setsOf(en).map(cleanSet),
+      ...marked(en, true)
+    })),
+    ...skippedPart(w, true)
   };
 }
 
@@ -572,6 +607,85 @@ function pastDebriefs(coach, from) {
   return out.reverse();
 }
 
+/* ---------- the marks, counted ----------
+   One mark is one session. What a review can act on is the same mark on the same exercise more
+   than once, and whether that is so is worked out here rather than left to the model to count
+   across sixty sessions, most of which reach it as one line each — the reason stalls are counted
+   in `aggregates`. Like the stall count it does not stop at the last review: a mark set before it
+   and again after it is still twice. So this reads the last MAX_WEEKS whatever the window is, and
+   says which days, so a mark can be placed before or after a change in `recentChanges`.
+
+   Nothing is stored for it. It is worked out from the log every time, as the stalls are. */
+export const OBSERVATIONS_MAX = 30;
+export const OBSERVATION_DATES = 4;
+export const OBSERVATION_NOTES = 2;
+export const OBSERVATION_NOTE_CHARS = 160;
+
+/**
+ * @param {object} S     the synced state
+ * @param {Set} [only]   exercise ids to keep (a debrief reads its own session's exercises)
+ * @returns the marks of the last twelve weeks, or null when there are none
+ */
+function observations(S, only) {
+  const workouts = reviewWindow(S, null).filter(w => day(w.d));
+  const nameOf = exNamer(S);
+  const planned = new Set();
+  list(S.routines).forEach(r => list(r?.ex).forEach(e => planned.add(ident(e?.id))));
+  const items = new Map();    // exercise and kind -> the sessions that carry the mark
+  const trained = new Map();  // exercise -> the sessions it was part of
+  const byKind = {};
+  for (const w of workouts) {
+    // One session counts once for an exercise and a kind, however often the exercise appears.
+    const here = new Map();
+    const read = (en, skipped) => {
+      const id = ident(en.id);
+      const flags = flagsOf(en.flags);
+      if (id == null || !(flags.length || setsOf(en).some(s => s.done))) return;
+      const at = here.get(id) || { flags: new Set(), skipped: true, note: '' };
+      flags.forEach(k => at.flags.add(k));
+      if (!skipped) at.skipped = false;
+      if (flags.length && !at.note) at.note = text(en.note, OBSERVATION_NOTE_CHARS).trim();
+      here.set(id, at);
+    };
+    entriesOf(w).forEach(en => read(en, false));
+    skippedOf(w).forEach(en => read(en, true));
+    const kinds = new Set();
+    for (const [id, at] of here) {
+      trained.set(id, (trained.get(id) || 0) + 1);
+      for (const kind of at.flags) {
+        kinds.add(kind);
+        const key = id + '|' + kind;
+        const it = items.get(key) || { id, flag: kind, dates: [], skipped: 0, notes: [] };
+        it.dates.push(day(w.d));
+        if (at.skipped) it.skipped++;
+        if (at.note) it.notes.push({ d: day(w.d), text: at.note });
+        items.set(key, it);
+      }
+    }
+    kinds.forEach(k => { byKind[k] = (byKind[k] || 0) + 1; });
+  }
+  if (!items.size) return null;
+  // Pain first, then whatever was marked most often, then most recently.
+  const rank = it => (it.flag === 'pain' ? 0 : 1);
+  const exercises = [...items.values()]
+    .filter(it => !only || only.has(it.id))
+    .sort((a, b) => rank(a) - rank(b) || b.dates.length - a.dates.length || (b.dates.at(-1) || '').localeCompare(a.dates.at(-1) || ''))
+    .slice(0, OBSERVATIONS_MAX)
+    .map(it => ({
+      id: it.id, name: nameOf(it.id), flag: it.flag,
+      times: it.dates.length, of: trained.get(it.id),
+      ...(it.skipped ? { skipped: it.skipped } : {}),
+      dates: it.dates.slice(-OBSERVATION_DATES),
+      ...(it.notes.length ? { notes: it.notes.slice(-OBSERVATION_NOTES) } : {}),
+      inPlan: planned.has(it.id)
+    }));
+  return {
+    from: day(workouts[0]?.d), to: day(workouts[workouts.length - 1]?.d), sessions: workouts.length,
+    byKind: Object.fromEntries(FLAG_KINDS.filter(k => byKind[k]).map(k => [k, byKind[k]])),
+    exercises
+  };
+}
+
 /* ---------- the charter: what the plan is for, and when it is looked at whole ----------
    The intake has one goal word. The charter (frontend/src/lib/coach-charter.js) is what the
    person wrote beyond it — a goal in their own words, lifts they want to reach — and the block
@@ -686,9 +800,12 @@ export function build(S, opts = {}) {
       const previous = all.slice(0, idx).filter(x => x.name && x.name === w.name).slice(-3);
       p.session = { id: ident(w.id) || null, ...cleanWorkout(w) };
       p.previous = previous.map(cleanWorkout);
-      const inSession = new Set(entriesOf(w).map(en => ident(en.id)));
+      const inSession = new Set([...entriesOf(w), ...skippedOf(w)].map(en => ident(en.id)));
       const agg = aggregates(S, [w]);
       p.aggregates = { ...agg, exercises: agg.exercises.filter(e => inSession.has(e.id)) };
+      // What was marked on this session's exercises before, so a second time reads as one.
+      const seen = observations(S, inSession);
+      if (seen) p.observations = seen;
       // The four weeks before the session. A session whose date does not parse has no "before",
       // and used to throw here instead.
       const on = day(w.d);
@@ -716,6 +833,9 @@ export function build(S, opts = {}) {
     if (changed.length) p.recentChanges = changed;
     const read = pastDebriefs(coach, p.window.from);
     if (read.length) p.debriefs = read;
+    // What they marked on exercises, counted over twelve weeks rather than over the window.
+    const seen = observations(S);
+    if (seen) p.observations = seen;
     if (opts.note) p.userNote = String(opts.note).slice(0, MAX_NOTE_CHARS);
     if (opts.cohort) p.cohort = cleanCohort(opts.cohort);
     // A review names mostly what is already trained; 60 candidates is plenty for a swap.
@@ -735,6 +855,9 @@ export function build(S, opts = {}) {
         workingWeights: Object.entries(best).map(([id, w]) => ({ id: ident(id), name: libraryName(id), best: w }))
       };
     }
+    // A new plan should not bring back what was marked as painful or disliked on the old one.
+    const seen = observations(S);
+    if (seen) p.observations = seen;
     if (opts.refine && opts.previous) {
       p.refine = { text: String(opts.refine).slice(0, MAX_NOTE_CHARS), previous: opts.previous };
     } else if (opts.refine) {

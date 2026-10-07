@@ -56,6 +56,8 @@ import { weeklyWeights } from './lib/bodyweight.js'
 import { workoutText } from './lib/workout-text.js'
 import { copyText } from './lib/clipboard.js'
 import { queueRemaining, pinState } from './lib/queue.js'
+import { cleanFlags, setEntryFlags } from './lib/exercise-flags.js'
+import { FlagPicker, FlagTags } from './components/ExerciseFlags.jsx'
 
 const S = () => useStore.getState().S
 const update = (...a) => useStore.getState().update(...a)
@@ -2192,6 +2194,7 @@ function WorkoutDetail({ w, close }) {
       {ex && <Thumb ex={ex} />}
       <div className="grow"><div className={`tt ${exerciseNameClass(ex)}`} style={{ fontWeight: 600 }}>{nameOf(e)} {w.prs && w.prs.includes(e.id) && <span className="pr"><Icon name="trophy" />PR</span>}</div>
         <div className="ss">{e.sets.filter(hasCompletedWork).map(s => setLabel(e.id, s, e.target, speedUnitOf(st))).join('  ·  ') || t('no sets')}</div>
+        <FlagTags flags={e.flags} style={{ marginTop: 5 }} />
         {e.note && <div className="small dim" style={{ marginTop: 3 }}>
           {e.notePin && <Icon name="pin" style={{ fontSize: 12, marginInlineEnd: 4, verticalAlign: '-1px', color: 'var(--yellow)' }} />}{e.note}
         </div>}</div>
@@ -2237,6 +2240,15 @@ function WorkoutDetail({ w, close }) {
         {entryRows(g.units)}
       </div>
     }) : entryRows(groups[0]?.units || [])}
+    {/* Marked exercises that ended the session with nothing logged (lib/exercise-flags.js). */}
+    {w.skipped?.length > 0 && <div style={{ margin: '4px 0 12px' }}>
+      <div className="small muted" style={{ marginBottom: 6 }}>{t('Marked, not done')}</div>
+      {w.skipped.map((e, i) => <div key={i} className="small" style={{ marginBottom: 8 }}>
+        <div className={exerciseNameClass(EXIDX[e.id])} style={{ fontWeight: 600 }}>{nameOf(e)}</div>
+        <FlagTags flags={e.flags} style={{ marginTop: 4 }} />
+        {e.note && <div className="dim" style={{ marginTop: 3 }}>{e.note}</div>}
+      </div>)}
+    </div>}
     {/* Progress photos and form-check videos: added and removed right here, on the saved record. */}
     <WorkoutMediaSection w={w} />
     <div className="small muted" style={{ margin: '4px 0 6px' }}>{t('Session note')}</div>
@@ -2594,6 +2606,7 @@ function ExerciseNote({ entryIdx, close }) {
   const ex = entry ? exOr(entry.id) : null
   const [note, setNote] = useState(entry?.note || '')
   const [pin, setPin] = useState(!!entry?.notePin)
+  const [flags, setFlags] = useState(() => cleanFlags(entry?.flags))
   const [standing, setStanding] = useState(entry ? (st.exNotes?.[entry.id] || '') : '')
   useEffect(() => { if (!entry) close() }, [!entry])
   if (!entry) return null
@@ -2606,6 +2619,7 @@ function ExerciseNote({ entryIdx, close }) {
       if (e) {
         if (today) { e.note = today; if (pin) e.notePin = true; else delete e.notePin }
         else { delete e.note; delete e.notePin }
+        setEntryFlags(e, flags)
       }
       if (!editing) {
         s.exNotes = s.exNotes || {}
@@ -2619,6 +2633,7 @@ function ExerciseNote({ entryIdx, close }) {
   return <>
     <h3 className={exerciseNameClass(ex)}>{exerciseNameFor(ex)}</h3>
     <div className="small muted" style={{ marginBottom: 6 }}>{t('This session')}</div>
+    <FlagPicker value={flags} onChange={setFlags} style={{ marginBottom: 10 }} />
     <textarea ref={noteRef} className="input" rows={3} maxLength={NOTE_MAX} value={note}
       placeholder={t('How it went, what to change. Saved with today’s workout.')}
       onFocus={onNoteFocus} onChange={e => setNote(e.target.value)} />

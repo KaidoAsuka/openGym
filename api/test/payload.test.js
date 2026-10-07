@@ -288,6 +288,73 @@ test('debriefs written about sessions in the window travel on a review, one per 
   for (const kind of ['create', 'debrief']) assert.equal('debriefs' in payload.build(S, { handle: handleFor('u1'), kind }), false);
 });
 
+/* ---------- marks on exercises ---------- */
+// Dated from today, like the debriefs above: the marks are counted over the last twelve weeks of
+// the clock, not of the fixture.
+const ago = n => new Date(Date.now() - n * DAY).toISOString().slice(0, 10);
+const markedState = () => {
+  const sets = [{ w: 20, r: 10, done: true }];
+  const S = sampleState();
+  S.coach.lastReview = { at: ago(10) };
+  S.workouts = [
+    { id: 'a', d: ago(100), name: 'Full body A', start: 1, end: 2, entries: [{ id: '0001', sets, flags: ['equipment', 'pain'] }] },
+    { id: 'b', d: ago(20), name: 'Full body A', start: 1, end: 2, entries: [{ id: '0001', sets, flags: ['equipment', 'made up'], note: '  rack taken  ' }] },
+    {
+      id: 'c', d: ago(6), name: 'Full body A', start: 1, end: 2,
+      entries: [{ id: '0001', sets, flags: ['heavy', 'equipment'] }, { id: '0007', sets: [{ sec: 45, done: true }], note: 'felt fine' }],
+      skipped: [{ id: '0025', flags: ['pain'], note: 'shoulder' }]
+    },
+    { id: 'd', d: ago(2), name: 'Full body A', start: 1, end: 2, entries: [{ id: '0001', sets }], skipped: [{ id: '0007', flags: ['time'] }] }
+  ];
+  return S;
+};
+
+test('the same mark twice on an exercise is counted for the Coach, with its days, across the last review', () => {
+  const p = payload.build(markedState(), { handle: handleFor('u1'), kind: 'review' });
+  assert.equal(p.window.workouts.length, 2, 'the window starts at the last review');
+  const o = p.observations;
+  assert.deepEqual({ from: o.from, to: o.to, sessions: o.sessions }, { from: ago(20), to: ago(2), sessions: 3 }, 'twelve weeks, whatever the window');
+  assert.deepEqual(o.byKind, { pain: 1, equipment: 2, time: 1, heavy: 1 });
+  assert.deepEqual(o.exercises, [
+    // Pain first, though it was marked once.
+    { id: '0025', name: payload.libraryName('0025'), flag: 'pain', times: 1, of: 1, skipped: 1, dates: [ago(6)], notes: [{ d: ago(6), text: 'shoulder' }], inPlan: false },
+    // One of the two is older than the last review, and still counts.
+    { id: '0001', name: payload.libraryName('0001'), flag: 'equipment', times: 2, of: 3, dates: [ago(20), ago(6)], notes: [{ d: ago(20), text: 'rack taken' }], inPlan: true },
+    { id: '0007', name: payload.libraryName('0007'), flag: 'time', times: 1, of: 2, skipped: 1, dates: [ago(2)], inPlan: true },
+    { id: '0001', name: payload.libraryName('0001'), flag: 'heavy', times: 1, of: 3, dates: [ago(6)], inPlan: true }
+  ]);
+});
+
+test('the marks, the note on an exercise and the skipped exercises travel on the sessions themselves', () => {
+  const S = markedState();
+  S.coach.lastReview = null;
+  S.workouts.push({ id: 'e', d: ago(1), name: 'Full body A', start: 1, end: 2, entries: [{ id: '0001', sets: [{ w: 20, r: 10, done: true }], note: 'n'.repeat(900) }] });
+  const p = payload.build(S, { handle: handleFor('u1'), kind: 'review' });
+  const [b, c, d, e] = p.window.workouts;
+  // An older session is one line per exercise: the mark rides along, what was typed does not.
+  assert.equal(b.compact, true);
+  assert.deepEqual(b.entries[0].flags, ['equipment']);
+  assert.equal('note' in b.entries[0], false);
+  assert.deepEqual(c.entries.map(en => [en.flags, en.note]), [[['equipment', 'heavy'], undefined], [undefined, 'felt fine']]);
+  assert.deepEqual(c.skipped, [{ id: '0025', name: payload.libraryName('0025'), flags: ['pain'], note: 'shoulder' }]);
+  assert.deepEqual(d.skipped, [{ id: '0007', name: payload.libraryName('0007'), flags: ['time'] }]);
+  assert.equal(e.entries[0].note.length, payload.ENTRY_NOTE_CHARS);
+  // An exercise nobody marked is the shape it always was.
+  assert.deepEqual(Object.keys(d.entries[0]), ['id', 'name', 'target', 'sets']);
+  assert.equal('skipped' in e, false);
+});
+
+test('a debrief reads the marks on the exercises of its own session, a new plan reads them all, and no marks is no field', () => {
+  const S = markedState();
+  const debrief = payload.build(S, { handle: handleFor('u1'), kind: 'debrief', workoutId: 'd' });
+  assert.deepEqual(debrief.session.skipped, [{ id: '0007', name: payload.libraryName('0007'), flags: ['time'] }]);
+  assert.deepEqual(debrief.observations.exercises.map(x => x.id + ':' + x.flag), ['0001:equipment', '0007:time', '0001:heavy'], 'the bench press was not part of this session');
+  assert.deepEqual(debrief.observations.byKind, { pain: 1, equipment: 2, time: 1, heavy: 1 });
+  const create = payload.build(S, { handle: handleFor('u1'), kind: 'create' });
+  assert.equal(create.observations.exercises.length, 4);
+  for (const kind of ['create', 'review', 'debrief']) assert.equal('observations' in payload.build(sampleState(), { handle: handleFor('u1'), kind }), false);
+});
+
 /* ---------- the charter ---------- */
 test('the charter travels on every task, with the exercise named and the block placed on the calendar', () => {
   const DAYS = n => new Date(Date.now() + n * DAY).toISOString().slice(0, 10);

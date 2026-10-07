@@ -245,6 +245,31 @@ describe('saved workout editing', () => {
     expect(mergeStates(other, { ...state, _ts: 1 }).workouts.map(w => w.entries[0].sets[0].w)).toEqual([40, 35])
   })
 
+  it('sets and takes away the marks on an exercise, and asks nothing when they were left alone', () => {
+    const state = fixture()
+    state.workouts[0].entries[0].flags = ['pain']
+    state.workouts[0].skipped = [{ id: 'row', flags: ['time'] }]
+    editCompletedSession(state, 'workout')
+    expect(editChangesNothing(state)).toBe(true)
+    state.active.entries[0].flags = ['heavy']
+    expect(editChangesNothing(state)).toBe(false)
+    expect(saveWorkoutEdit(state)).toMatchObject({ entries: [{ flags: ['heavy'] }], skipped: [{ id: 'row', flags: ['time'] }] })
+
+    editCompletedSession(state, 'workout')
+    delete state.active.entries[0].flags
+    expect(saveWorkoutEdit(state).entries[0]).not.toHaveProperty('flags')
+  })
+
+  it('stops calling an exercise skipped once the editor logs it', () => {
+    const state = fixture()
+    state.workouts[0].skipped = [{ id: 'row', flags: ['time'], note: 'no time' }]
+    editCompletedSession(state, 'workout')
+    state.active.entries.push(entry(30, 'row'))
+    const saved = saveWorkoutEdit(state)
+    expect(saved).not.toHaveProperty('skipped')
+    expect(saved.entries[1]).toMatchObject({ id: 'row', flags: ['time'], note: 'no time' })
+  })
+
   it('keeps only the loads, not the marks the live session used, and no prescription explanation', () => {
     const state = fixture()
     editCompletedSession(state, 'workout')

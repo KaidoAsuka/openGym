@@ -36,6 +36,27 @@ describe('safe active exercise swap', () => {
     expect(active.cur).toBe(1)
   })
 
+  // "The station was taken" is why the exercise is swapped out; it says nothing about what
+  // replaces it. The mark stays with the session under the old exercise, with its note.
+  it('leaves a mark, and the note written with it, on the exercise that was swapped out', () => {
+    const marked = { ...entry('bench'), flags: ['equipment'], note: 'rack taken', notePin: true, rid: 'r1' }
+    const active = { cur: 0, entries: [marked] }
+    const next = replacement()
+
+    expect(swapActiveExercise(active, 0, next)).toEqual({ inserted: false, index: 0 })
+    expect(active.entries[0]).toEqual({ ...next, rid: 'r1' })
+    expect(active.skipped).toEqual([{ id: 'bench', flags: ['equipment'], note: 'rack taken' }])
+  })
+
+  it('still carries the note of an unmarked exercise onto its replacement', () => {
+    const active = { cur: 0, entries: [{ ...entry('bench'), note: 'elbows in', notePin: true }] }
+    const next = replacement()
+
+    swapActiveExercise(active, 0, next)
+    expect(active.entries[0]).toEqual({ ...next, note: 'elbows in', notePin: true })
+    expect('skipped' in active).toBe(false)
+  })
+
   it('fails closed before a logged standalone occurrence is explicitly confirmed', () => {
     const logged = entry('bench', { sets: [{ w: 42.5, r: 7, done: true, rir: 1 }] })
     const active = { cur: 0, entries: [logged, entry('row')] }

@@ -40,6 +40,8 @@ import { isWarmupRow, isDropSet, isRestPauseSet, dropsOf, clustersOf, addDrop, a
 import { canMoveActiveWorkoutUnit, moveActiveWorkoutUnit } from '../lib/active-workout-order.js'
 import { nextOpenSet, workoutKeyAction } from '../lib/workout-keys.js'
 import { MUSCLE_NAME } from '../lib/muscles.js'
+import { keepMarked } from '../lib/exercise-flags.js'
+import { FlagTags } from '../components/ExerciseFlags.jsx'
 
 // How long after a key starts a hold the same key is not yet its "Done" (#133). A USB button
 // that bounces, or a double press, sends two presses a moment apart: the first starts the hold,
@@ -601,7 +603,7 @@ function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSi
       {thumb && <WorkoutThumb ex={ex} onExpand={() => update(s => { s.gifSize = 'full' })} />}
       <div style={{ flex: 1, minWidth: 0, fontSize: (compact || dense) ? 17 : 20, fontWeight: 600, letterSpacing: '-.02em', lineHeight: 1.2 }} className={exerciseNameClass(ex)}>{exerciseNameFor(ex)}</div>
       <div className="row" style={{ gap: 2, flex: 'none' }}>
-        {entry.note && <button className="iconbtn" aria-label={t('Note')} title={t('Note')} style={{ color: 'var(--acc)' }}
+        {(entry.note || entry.flags?.length > 0) && <button className="iconbtn" aria-label={t('Note')} title={t('Note')} style={{ color: 'var(--acc)' }}
           onClick={() => exerciseNoteSheet(entryIdx)}><Icon name="note" /></button>}
         <button className="iconbtn" aria-label={t('More')} title={t('More')} onClick={openMore}><Icon name="more" /></button>
       </div>
@@ -643,6 +645,7 @@ function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSi
       <Icon name="pin" style={{ fontSize: 13, marginInlineEnd: 5, verticalAlign: '-2px' }} />
       {t('From {0}:', fmtDate(pinnedNote.d, true))} {pinnedNote.note}
     </div>}
+    <FlagTags flags={entry.flags} style={{ marginBottom: 10 }} />
     {entry.note && <div className="exnote">{entry.note}</div>}
     {planLine}
     {refLine}
@@ -846,6 +849,8 @@ export function removeActiveExercise(idx) {
   useStore.getState().update(s => {
     if (!s.active || !Array.isArray(s.active.entries)) return
     if (idx < 0 || idx >= s.active.entries.length) return
+    // A marked exercise leaves its mark with the session (lib/exercise-flags.js).
+    keepMarked(s.active, s.active.entries[idx])
     s.active.entries.splice(idx, 1)
     cleanupSg(s.active.entries)
     if (idx < s.active.cur) s.active.cur--

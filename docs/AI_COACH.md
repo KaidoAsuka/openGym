@@ -236,7 +236,7 @@ renders from, so the screen cannot drift from the payload — are:
 | Category | What it covers |
 | --- | --- |
 | `plan` | routines, exercises, sets/reps, schedule, progression settings |
-| `training` | logged sets, targets, effort ratings, durations, PRs and session notes in the review window |
+| `training` | logged sets, targets, effort ratings, durations, PRs and session notes in the review window, and the marks and notes you put on exercises |
 | `bodyweight` | weigh-ins in the window and your goal weight |
 | `profile` | the intake answers you gave the Coach, including any limitations, and what you set under *Goal & checkpoint* (your goal in your own words, target lifts, the block's length and dates) |
 | `cohort` (optional) | only with comparison on and your own opt-in: anonymous medians from the other people sharing — never their data, and never yours to them beyond the same medians |
@@ -252,6 +252,17 @@ is marked as undone), and what it wrote after single sessions in the window (sco
 what to watch, what to do next time; at most six). These are things the Coach said earlier about
 your plan and your training, not a new category of data, and they are cut to fixed lengths like
 everything else in the payload.
+
+**Marks on exercises.** The note sheet of an exercise has a row of marks next to the text: pain,
+uncomfortable, equipment taken, out of time, too heavy, too light, don't like it. They are saved
+with the exercise (`flags`), and an exercise that was marked and then left the session without a
+set — swapped out, removed, never reached — is kept on the workout under `skipped`, so its mark
+is not lost with it. The payload carries the marks on each session, the note typed about an
+exercise (200 characters, the last three sessions only), and `observations`: the marks counted
+per exercise over the last twelve weeks, with their dates. The count is worked out from the log
+on every job, like the stall count, and does not stop at the last review. The prompts ask a
+review to act on the same mark twice, to treat one mark as one session, and to act on pain the
+first time.
 
 Excluded on purpose and permanently: **display name and user id, passkey and credential
 material, push subscriptions, invite data, theme and appearance settings, and every other

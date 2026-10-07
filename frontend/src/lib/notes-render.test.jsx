@@ -73,6 +73,35 @@ describe('exercise note sheet', () => {
     expect(useUI.getState().sheets).toHaveLength(0)
   })
 
+  it('saves the marks tapped in the row, without needing a note', () => {
+    const host = renderSheet()
+    const chip = kind => host.querySelector(`[data-flag="${kind}"]`)
+    expect(host.querySelectorAll('[data-flag]')).toHaveLength(7)
+    act(() => { chip('pain').click() })
+    act(() => { chip('equipment').click() })
+    act(() => { chip('pain').click() })
+    expect(chip('equipment').getAttribute('aria-pressed')).toBe('true')
+    expect(chip('pain').getAttribute('aria-pressed')).toBe('false')
+    const save = [...host.querySelectorAll('button')].find(b => /save/i.test(b.textContent))
+    act(() => { save.click() })
+    const e = useStore.getState().S.active.entries[0]
+    expect(e.flags).toEqual(['equipment'])
+    expect(e.note).toBeUndefined()
+  })
+
+  it('opens with the marks already set, and takes the field away with the last one', () => {
+    useStore.setState(s => ({
+      S: { ...s.S, active: activeWith({ id: 'bench', sets: [], flags: ['heavy'] }) },
+    }))
+    const host = renderSheet()
+    const heavy = host.querySelector('[data-flag="heavy"]')
+    expect(heavy.getAttribute('aria-pressed')).toBe('true')
+    act(() => { heavy.click() })
+    const save = [...host.querySelectorAll('button')].find(b => /save/i.test(b.textContent))
+    act(() => { save.click() })
+    expect('flags' in useStore.getState().S.active.entries[0]).toBe(false)
+  })
+
   it('clearing the session note drops the pin with it', () => {
     useStore.setState(s => ({
       S: { ...s.S, active: activeWith({ id: 'bench', sets: [], note: 'old', notePin: true }) },

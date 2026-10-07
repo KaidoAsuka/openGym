@@ -33,6 +33,8 @@ import { charterLine, addDays } from '../lib/coach-charter.js'
 import CharterSheet from './CoachCharter.jsx'
 import DigestsSheet from './CoachDigests.jsx'
 import CoachPlanNotes, { PlanBasis } from '../components/CoachPlanNotes.jsx'
+import CycleSheet, { CycleOutline, LookCard } from './CoachCycle.jsx'
+import { bundleCycleView, cycleWeek } from '../lib/coach-cycle.js'
 import { useCoachStatus, requestReview, requestDebrief, requestPlan, refinePlan, resolvePending, cohortStats, setCohortShare, jobErrorText, awaitedJob, settleAwaited, JOB_ERRORS } from '../lib/coach-api.js'
 import { confirmSheet } from '../sheets.jsx'
 import Icon from '../components/Icon.jsx'
@@ -81,6 +83,9 @@ export default function CoachChat() {
     if (job) return
     // A weekly note is nobody's question: when the job writing one ends, the thread says nothing.
     if (was?.kind === 'digest') return
+    // A look at the cycle answers through what it changed (lib/coach-cycle.js); only one that
+    // was asked for and failed is said here.
+    if (was?.kind === 'adjust' && !(last?.kind === 'adjust' && last.outcome === 'failed')) return
     const mine = awaitedJob()
     const endedUnseen = !was && !!mine && last?.id === mine
     if (!was && !endedUnseen) return
@@ -170,6 +175,7 @@ export default function CoachChat() {
       {idle && <Row icon="clipboard" iconTint="var(--indigo)" title={t('Start a new plan')} subtitle={t('A fresh plan from your answers; your workouts stay')} accessory="chevron" onClick={() => { close(); askNewPlan() }} />}
       <Row icon="pencil" iconTint="var(--indigo)" title={t('Edit my answers')} subtitle={t('Goal, days, equipment, limits')} accessory="chevron" onClick={() => closeThenNav(close, '/coach/intake?edit=1')} />
       <Row icon="target" iconTint="var(--red)" title={t('Goal & checkpoint')} subtitle={charterLine(coach.charter)} accessory="chevron" onClick={() => { close(); openSheet(done => <CharterSheet close={done} />) }} />
+      {!!coach.cycle && <Row icon="calendar" iconTint="var(--green)" title={t('Training cycle')} subtitle={t('Week {0} of {1}', cycleWeek(S), coach.cycle.weeks)} accessory="chevron" onClick={() => { close(); openSheet(done => <CycleSheet close={done} canAsk={idle} onAsked={refresh} />) }} />}
       <Row icon="calendar" iconTint="var(--teal)" title={t('Weekly notes')} subtitle={t('What the Coach wrote down about each week')} accessory="chevron" onClick={() => { close(); openSheet(() => <DigestsSheet />) }} />
       <Row icon="clock" iconTint="var(--purple)" title={t('Automatic reviews')} subtitle={cadenceLabel(coach)} accessory="chevron" onClick={() => { close(); cadenceSheet(openSheet, update) }} />
       {canRevert(S) && <Row icon="reset" iconTint="var(--blue)" title={t('Undo the last Coach changes')} accessory="chevron" onClick={() => { close(); doRevert() }} />}
@@ -264,6 +270,13 @@ function Message({ m, S, profile, openSheet }) {
       {m.at && <div className="msg-t">{stamp(m.at)}</div>}
     </div>
   }
+  // A correction the Coach made to the cycle by itself: what moved and why, and the way back.
+  if (m.kind === 'adjusted') {
+    return <div className="msg coach" style={{ maxWidth: '100%', width: '100%' }}>
+      <LookCard id={m.ref} />
+      {m.at && <div className="msg-t">{stamp(m.at)}</div>}
+    </div>
+  }
   if (m.kind === 'reverted' || m.kind === 'nochange' || m.kind === 'error' || m.kind === 'text') {
     return <Bubble role={m.role} kind={m.kind} at={m.at}>{m.text}</Bubble>
   }
@@ -291,7 +304,7 @@ function Typing({ S, kind, coachLocal, config }) {
     // local model rather than something wrong; the next line already warns it takes longer.
     eta = local ? '' : t('This usually takes a minute or two.')
   }
-  const doing = kind === 'create' ? t('Building your plan…') : kind === 'debrief' ? t('Looking at that session…') : kind === 'digest' ? t('Writing up last week…') : t('Reading your training…')
+  const doing = kind === 'create' ? t('Building your plan…') : kind === 'debrief' ? t('Looking at that session…') : kind === 'digest' ? t('Writing up last week…') : kind === 'adjust' ? t('Checking the plan against your last session…') : t('Reading your training…')
   return <div className="msg coach">
     <div className="bub typing"><i /><i /><i /></div>
     <div className="typing-eta">
@@ -359,6 +372,11 @@ function PlanCard({ p, S, update, toast, nav, refresh }) {
       {r && <RoutineBlock r={r} unit={S.unit} speedUnit={speedUnitOf(S)} />}
 
       <CoachPlanNotes bundle={b} />
+
+      {!!b.cycle && <div className="pcard-notes cyc-wrap">
+        <div className="pcard-differs-h">{t('Training cycle')} · {t('Week {0} of {1}', 1, b.cycle.weeks)}</div>
+        <CycleOutline view={bundleCycleView(b)} unit={S.unit} speedUnit={speedUnitOf(S)} />
+      </div>}
 
       <div className="pcard-row">
         <span className="lrow-m"><span className="lrow-t">{t('Use this weekly schedule')}</span><span className="lrow-s">{t('Replaces your current week. Days this plan leaves empty become rest days.')}</span></span>

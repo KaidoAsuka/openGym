@@ -1260,6 +1260,28 @@ export const PT_BR_OVERRIDES = {
   'Weekly sets for {0}: {1} — below the usual minimum of {2}.': 'Séries semanais de {0}: {1} — abaixo do mínimo habitual de {2}.',
   '{0}: about {1} min by the app’s estimate — over the {2} min you set.': '{0}: cerca de {1} min pela estimativa do app — acima dos {2} min que você definiu.',
   '{0}: {1} sets for {2} in one session — more than the usual {3}.': '{0}: {1} séries de {2} em uma sessão — mais do que as {3} habituais.',
+  // Coach: a plan that runs as a cycle, and the corrections the Coach makes to its weeks
+  'A rep more on the first lift of each day.': 'Mais uma repetição no primeiro exercício de cada dia.',
+  'After each session the Coach checks the weeks still to come. Changes to weights, sets and reps apply by themselves, and you can undo the latest.': 'Depois de cada sessão, o Treinador confere as semanas que faltam. As mudanças de carga, séries e repetições valem na hora, e você pode desfazer a última.',
+  'An easier week: fewer sets, the same weights.': 'Uma semana mais leve: menos séries, as mesmas cargas.',
+  'As the week before, until the Coach fills it in.': 'Como a semana anterior, até o Treinador preencher.',
+  'Changed back — the weeks are as they were before that correction.': 'Desfeito — as semanas voltaram a ser como antes dessa correção.',
+  'Checking the plan against your last session…': 'Comparando o plano com a sua última sessão…',
+  'Every set last time was made with reps to spare.': 'Da última vez você fez todas as séries e ainda sobravam repetições.',
+  'Have the Coach look now': 'Pedir ao Treinador para olhar agora',
+  'Last look': 'Última verificação',
+  'Looked at your last session — the plan stands.': 'Olhei a sua última sessão — o plano continua como está.',
+  'No cycle is running. A plan from the Coach comes with one.': 'Não há nenhum ciclo em andamento. Um plano do Treinador vem com um.',
+  'The cycle has run its course. Ask for a new plan when you are ready.': 'O ciclo chegou ao fim. Peça um plano novo quando quiser.',
+  'The weeks go back to how they were before the Coach changed them. Workouts you have logged are untouched.': 'As semanas voltam a ser como antes de o Treinador mudá-las. Os treinos que você registrou não são alterados.',
+  'Three weeks of adding a little, then an easier one.': 'Três semanas aumentando um pouco, depois uma mais leve.',
+  'Training cycle': 'Ciclo de treino',
+  'Undo this change?': 'Desfazer esta mudança?',
+  'Undone': 'Desfeito',
+  'Week {0} of {1}': 'Semana {0} de {1}',
+  'Week {0}': 'Semana {0}',
+  'What the Coach changed': 'O que o Treinador mudou',
+  'Your last session went to plan, so the first lift moves up a rep sooner.': 'Sua última sessão saiu como planejado, então o primeiro exercício ganha uma repetição mais cedo.',
 }
 
 export default { ...pt, ...PT_BR_OVERRIDES }

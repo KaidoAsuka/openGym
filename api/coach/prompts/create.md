@@ -1,6 +1,6 @@
 # Task: build a weekly training plan
 
-Design a complete plan from `coachProfile` (their intake answers) and, if present, `charter` (what they are training toward), `history` (what they have already been lifting) and `programs` (established programmes to build from).
+Design a complete plan from `coachProfile` (their intake answers) and, if present, `charter` (what they are training toward), `history` and `lifts` (what they have already been lifting, and what each lift is at) and `programs` (established programmes to build from).
 
 ## Constraints
 
@@ -8,14 +8,24 @@ Design a complete plan from `coachProfile` (their intake answers) and, if presen
 - Fit `coachProfile.sessionMin` minutes, counted the way principle V6 counts them: 2.5 minutes per straight set, 1.5 per set of an exercise in a superset (`sg`). Add each day up before you answer; a day over the limit is rejected. For cardio, `sets` is the number of bouts, so one 20-minute bout is `sets: 1` with `min: 20`.
 - Keep every body part at or under its weekly ceiling (principle V2): add up `sets` by the `bp` of each exercise, over the days in `week`, before you answer. A routine trained on two days counts twice.
 - Only exercises from `library`. Respect `equipment`, `limitations`, and `dislikes` — a plan someone will not do is a plan that failed.
-- If `history.workingWeights` is present, any starting `weight` you set must be at or below what they have already handled for that exercise. For anything they have not trained, omit `weight` entirely — the app's first session sets the baseline.
+- Weights go in `cycle` (below), not on `routines[].ex[]`: a `weight` written there is brought down to their best logged set, and dropped for a lift they have never trained.
 - 1–7 routines, each 3–12 exercises, compound work before accessories.
 - If `observations` is present, it is what they marked on exercises in the last twelve weeks. Leave out an exercise marked `pain`, and one marked `dislike` or `discomfort` twice or more (`times ≥ 2`), and choose something else for the same job. `equipment` twice or more means that station is often taken — prefer an alternative. Say in the `why` of the replacement what it replaces and which mark led to it.
 - When `charter.goal` or `charter.targets` is present, build the plan for it: the target lifts are in the plan and trained first, and `summary` says how the plan serves the goal. If a target is not realistic inside one block, say what this block is expected to reach instead. Do not promise a number.
 
+## The weeks
+
+A plan runs as a cycle: put `cycle` in the answer and the app trains each week at the numbers you give it, with its own progression switched off for every exercise whose weight you set (hard rule 4, the W rules). `routines` and `week` are still the plan — the exercises, the days, and each exercise's sets and reps as the first week trains them — and `cycle` says what each week is done at. Leave `cycle` out only when they ask for the app's own automatic progression.
+
+- One entry a week: `{ "week": 2, "focus": "<what this week is for, one line>", "sessions": [{ "routine": "<routines[].id>", "ex": [{ "id": "<an exercise of that routine>", "sets": 5, "reps": 5, "weight": 80 }] }] }`. Give only the numbers a week sets: an exercise a week does not mention is done as in the latest week that did. A routine has one set of numbers a week, so two training days that should differ are two routines.
+- Write the first two weeks in full, with a `weight` for every exercise that has a record in `lifts`. Later weeks may be rough — `focus` alone is enough — and are filled in nearer the time from how training went. Do not invent precision for week nine. A programme that is laid out to its last week (its entry gives every week) is written out to its last week.
+- `weight` is in `meta.unit` and stands for all work sets of the exercise that week: an exercise has one load a session here. Set it by the W rules — from `lifts`, by the programme's own arithmetic when the plan follows one, rounded to what can be loaded. A lift with no record in `lifts` gets no `weight` (W6).
+- The cycle is as long as `block.weeks`. An easier week (D1) is a week of the cycle with its own numbers (W8).
+- Every week you give numbers for is held to the two counted limits, like the plan itself.
+
 ## Programmes
 
-`programs`, when present, is what the app's catalogue of established programmes holds for this request. An entry is all you are given about a programme: `structure`, `progression`, `fit` (`close` — the app runs it nearly as written; `partial` — its layout fits, one of its rules does not; `none` — it is built on something the app does not have), `policy` (the app's progression policy that carries its main lifts), `adapt` (what has to change in this app), `caveats`, and `verified` (`A` — its rules were checked against the source; `B` — its outline was, the details come from a summary; `C` — only that it exists, and its rough shape).
+`programs`, when present, is what the app's catalogue of established programmes holds for this request. An entry is all you are given about a programme: `structure`, `progression`, `fit` (`close` — the app runs it nearly as written; `partial` — its layout fits, one of its rules does not; `none` — it is built on something the app does not have), `cycle` (`true` when its weeks differ from one another, so it is run by writing them out in your `cycle`), `policy` (the app's progression policy that carries its main lifts when it is not run that way), `adapt` (what has to change in this app), `caveats`, and `verified` (`A` — its rules were checked against the source; `B` — its outline was, the details come from a summary; `C` — only that it exists, and its rough shape).
 
 - With `programs.matched: "answers"`, `candidates` are programmes that fit their goal, experience, days and equipment. Build from the one that suits this person best, or from none of them when none does: they are starting points, not an obligation. A programme is a template of structure and rules. It is not evidence that it is the best way to train, and the principles still decide volume and effort.
 - Name the one you built from: its `id` in `program`, and in `basedOn` a sentence or two on what you kept from it and what you changed, for this person or for the app (`adapt`). `basedOn` and `summary` are read by the lifter: say it in plain words, without the entry's field names or values (`fit`, `adapt`, `close`) and without policy names in code quotes. Leave `program` out when you built from none. Never put an id there that is not in `candidates`.
@@ -45,6 +55,11 @@ Design a complete plan from `coachProfile` (their intake answers) and, if presen
   "basedOn": "<what you used — the programme and what you changed in it, 'your own plan', 'your last 12 weeks' or 'no history yet'>",
   "program": "<the id of the entry in programs.candidates you built from — leave this field out when you built from none>",
   "block": { "weeks": 8, "outline": "<2-4 short sentences: what these weeks build toward, where an easier week falls if you plan one, and what will be looked at when the block ends>" },
+  "cycle": [
+    { "week": 1, "focus": "<one line>", "sessions": [{ "routine": "r1", "ex": [{ "id": "<library id>", "sets": 3, "reps": 8, "weight": 60 }] }] },
+    { "week": 2, "focus": "<one line>", "sessions": [{ "routine": "r1", "ex": [{ "id": "<library id>", "weight": 62.5 }] }] },
+    { "week": 8, "focus": "<an easier week: about half the sets, about 10 % lighter>" }
+  ],
   "week": { "1": "r1", "3": "r2", "5": "r3" },
   "routines": [
     {
@@ -76,6 +91,6 @@ Design a complete plan from `coachProfile` (their intake answers) and, if presen
 - `mode` is `reps` (use `reps`), `time` (use `sec`), or `cardio` (use `min` and `speed`).
 - `prog` on a routine is its default; on an exercise it overrides. `inc` is the load step in `meta.unit`; `repsMin` only matters for `double`.
 - `sg`: give two exercises the same short string to superset them. They must be adjacent in the list.
-- `block` says how long this plan is meant to run before it is looked at as a whole. Use `charter.blockWeeks` when it is given; otherwise choose 4–12 weeks from their goal and experience — shorter for someone new or coming back, longer for someone training steadily. `outline` is a statement of intent, not a schedule the app runs: the app trains the same week until the plan is changed, and the progression engine sets every load (rule 4). So no week-by-week weights or percentages, and no phases the plan itself does not contain.
+- `block` says how long this plan is meant to run before it is looked at as a whole. Use `charter.blockWeeks` when it is given; otherwise choose 4–12 weeks from their goal and experience — shorter for someone new or coming back, longer for someone training steadily. `outline` is a statement of intent in a few sentences; the week-by-week numbers belong in `cycle`, not here.
 - `differences` belongs only to a plan they brought themselves (`coachProfile.ownPlan`): `"differences": ["<one line each>"]`. Leave the field out otherwise.
 - `customEx` stays empty unless the library genuinely lacks something the plan needs; then add `{ "id": "cx1", "n": "<name>", "bp": "<body part>", "desc": "<how to do it>" }` and reference `cx1` from a routine.

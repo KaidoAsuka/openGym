@@ -365,9 +365,9 @@ it, a source and how far the entry was checked against that source. When you ask
 `api/coach/core/kb.js` picks at most six that fit your goal, experience, days and equipment, and
 the model may build from one of them or from none. A plan may only name a programme it was
 handed: the card then shows the catalogue's own name and link, never the model's. Programmes
-that fit your answers but need something the app does not have — a training max, weeks that
-differ — are named to the model as well, to mention and not to build, so that a plan is never
-passed off as 5/3/1 without its rules.
+that fit your answers but need something the app still does not have — several loads for one
+lift in a session, a progression by rest time — are named to the model as well, to mention and
+not to build, so that a plan is never passed off as a programme without its rules.
 
 The last box of the intake takes a plan you want to follow, in your own words. With it filled in
 the job changes: the Coach lays your plan out and does not replace it. A programme you name is
@@ -379,6 +379,35 @@ trained for fewer than four sets a week, and one given more than half its weekly
 single session. Everything that is not a count holds as before — exercise ids, the week,
 starting weights, and anything you told the Coach about an injury. A later review is told the
 plan was yours and does not propose changes whose only reason is a range.
+
+**A plan that runs as a cycle.** The app trains one week and repeats it, with its own engine
+moving the weight. A plan from the Coach instead says what each week is done at: for every week
+of its block, each routine's sets, reps and the weight of each exercise (`cycle` in the answer,
+`api/coach/core/cycle.js`). A week says only what it changes and stands on the weeks before it,
+so far weeks can be left as a line of intent and filled in nearer the time. This is what lets a
+programme laid out over weeks — a Russian squat routine, a Texas method week with its three
+different days — be trained as written, and it is why the weights are the Coach's to set: from
+`lifts`, which the server works out from your log (an estimated one-rep max per lift, your best
+recent set, your last session), and by the programme's own arithmetic when the plan follows one.
+The weeks are held to the two counted limits like the plan itself.
+
+The app's plan stays one week. When you import the plan the phone keeps the weeks in its own
+state (`coach.cycle`) and writes the current week's numbers into the routines; when the week
+turns it writes the next. An exercise whose weight the cycle sets has the app's progression
+switched off, so two things do not move the same number; one it sets no weight for — a lift
+with no record yet — keeps the policy it was planned with until there is something to go on.
+
+**The daily look.** After a session of the cycle is synced, the scheduler queues one more job,
+`adjust`: the Coach reads the session against the weeks still to come and moves their sets,
+reps and weights where the log says to — a weight held because the sets were not made, a rough
+week given its numbers, the next step of a programme that moves after every session. It can
+only touch numbers of exercises the cycle's routines already hold, in weeks not yet trained;
+swapping an exercise or moving a day stays a review's, and yours to approve. These corrections
+are the one thing the Coach does without asking first. The phone applies them when it next
+opens, the chat shows what moved, from what to what and why, and the latest one can be undone.
+One look per session, counted against the daily cap like any other job; you can also ask for
+one from the cycle's own screen. A phone that brings its own key has no scheduler, so there a
+look happens only when asked for.
 
 A rejected answer gets **one** repair round, with the errors handed back verbatim. Two failures
 is a provider problem rather than a prompting problem, and a retry loop against a paid account

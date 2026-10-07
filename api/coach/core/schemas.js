@@ -59,6 +59,21 @@ const EX_SCHEMA = {
   required: ['id', 'sets']
 };
 
+// One exercise's numbers for one week, and one week of a cycle (core/cycle.js).
+const CYCLE_EX = {
+  type: 'object',
+  properties: { id: STR, sets: { type: 'integer' }, reps: { type: 'integer' }, sec: { type: 'integer' }, weight: { type: 'number' } },
+  required: ['id']
+};
+const CYCLE_WEEK = {
+  type: 'object',
+  properties: {
+    week: { type: 'integer' }, focus: STR,
+    sessions: { type: 'array', maxItems: 7, items: { type: 'object', properties: { routine: STR, ex: { type: 'array', maxItems: 20, items: CYCLE_EX } }, required: ['routine', 'ex'] } }
+  },
+  required: ['week']
+};
+
 // `week` and `routines[].id` are required, not optional: the week is the only thing that says
 // which day trains which routine, and it points at a routine by id. A schema that leaves either
 // out lets a small local model answer with routines that have no id and a week naming "r1" —
@@ -75,6 +90,8 @@ export const CREATE_SCHEMA = {
     // themselves — where it departs from the principles. Both optional.
     program: STR,
     differences: { type: 'array', maxItems: 6, items: { type: 'string' } },
+    // The weeks of the block when they differ: what each routine's exercises are done at.
+    cycle: { type: 'array', maxItems: 26, items: CYCLE_WEEK },
     // How long the plan runs before it is looked at whole, and what those weeks are for. Flat,
     // and optional: a plan without one is still a plan.
     block: { type: 'object', properties: { weeks: { type: 'integer' }, outline: STR } },
@@ -133,4 +150,27 @@ export const DIGEST_SCHEMA = {
   required: ['coach_contract', 'summary']
 };
 
-export const SCHEMAS = { review: REVIEW_SCHEMA, create: CREATE_SCHEMA, refine: CREATE_SCHEMA, debrief: DEBRIEF_SCHEMA, digest: DIGEST_SCHEMA };
+// The daily look at a running cycle: numbers of weeks not yet trained, and nothing else.
+export const ADJUST_SCHEMA = {
+  type: 'object',
+  properties: {
+    coach_contract: { type: 'integer' },
+    nochange: { type: 'boolean' },
+    reading: STR,
+    summary: STR,
+    changes: {
+      type: 'array',
+      maxItems: 30,
+      items: {
+        type: 'object',
+        properties: { week: { type: 'integer' }, routine: STR, exId: STR, sets: { type: 'integer' }, reps: { type: 'integer' }, sec: { type: 'integer' }, weight: { type: 'number' }, why: STR },
+        required: ['week', 'routine', 'exId', 'why']
+      }
+    },
+    weeks: { type: 'array', maxItems: 26, items: { type: 'object', properties: { week: { type: 'integer' }, focus: STR }, required: ['week', 'focus'] } },
+    notes: FEW
+  },
+  required: ['coach_contract']
+};
+
+export const SCHEMAS = { review: REVIEW_SCHEMA, create: CREATE_SCHEMA, refine: CREATE_SCHEMA, debrief: DEBRIEF_SCHEMA, digest: DIGEST_SCHEMA, adjust: ADJUST_SCHEMA };

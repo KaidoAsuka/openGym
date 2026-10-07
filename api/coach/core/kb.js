@@ -40,9 +40,15 @@ const brief = p => ({
   id: p.id, name: p.name, author: p.author, level: p.level, days: p.days,
   ...(p.weeks ? { weeks: p.weeks } : {}),
   structure: p.structure, progression: p.progression,
-  fit: p.fit, ...(p.policy ? { policy: p.policy } : {}), ...(p.adapt ? { adapt: p.adapt } : {}),
+  fit: p.fit, ...(p.cycle ? { cycle: true } : {}), ...(p.policy ? { policy: p.policy } : {}), ...(p.adapt ? { adapt: p.adapt } : {}),
   caveats: p.caveats, verified: p.verified
 });
+
+/** One entry as the model reads it, by id — for a job about a plan that is already running on it. */
+export function programBrief(id) {
+  const p = programById(id);
+  return p ? brief(p) : null;
+}
 
 /** What a plan card shows for the programme a plan names — read from the catalogue, never from
  *  the answer, so the name and the link on screen are the catalogue's own. */

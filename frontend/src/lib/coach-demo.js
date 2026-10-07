@@ -105,6 +105,16 @@ function buildPlan(S, intake) {
   ]
   const week = {}
   days.forEach((d, i) => { week[d] = routines[i % routines.length].id })
+  // The weeks, as a real plan carries them (lib/coach-cycle.js): four, the first as the routines
+  // stand, then a rep more, then an easier one. No weights — the demo profile has not lifted these.
+  const first = r => r.ex[0]?.id
+  const cycle = {
+    weeks: 4,
+    plan: [
+      { week: 2, focus: t('A rep more on the first lift of each day.'), sessions: routines.filter(first).map(r => ({ routine: r.id, ex: [{ id: first(r), reps: r.ex[0].reps + 1 }] })) },
+      { week: 4, focus: t('An easier week: fewer sets, the same weights.'), sessions: routines.filter(first).map(r => ({ routine: r.id, ex: [{ id: first(r), sets: 2, reps: r.ex[0].reps }] })) }
+    ]
+  }
   return {
     id: 'demo-plan', kind: 'create', createdAt: Date.now(), expiresAt: Date.now() + 864e5, iteration: 1,
     planHash: planHash(S),
@@ -118,6 +128,8 @@ function buildPlan(S, intake) {
       // the arms under four sets a week, which is exactly what the note is for.
       ...(intake?.ownPlan ? { own: true } : { program: { id: 'fierce-5', name: 'Fierce 5', author: 'davisj3537 (bodybuilding.com forum)', source: 'https://liftvault.com/programs/bodybuilding/fierce-5-beginner-bodybuilding-program-spreadsheet/' } }),
       advisories: [{ code: 'weekly-under', bp: 'upper arms', sets: 3, min: 4 }],
+      block: { weeks: 4, outline: t('Three weeks of adding a little, then an easier one.') },
+      cycle,
       week, routines, customEx: []
     }
   }
@@ -209,8 +221,32 @@ export const demoStatus = S => {
   // A profile the notes cannot be built from still has a status: the poll is what ends a job.
   let digests = []
   try { digests = demoDigests(S) } catch { /* no notes, then */ }
-  return { job, pending, cap: { used: 0, limit: 0 }, lastError, ...(digests.length ? { digests } : {}) }
+  const adjustments = demoLooks(S)
+  return { job, pending, cap: { used: 0, limit: 0 }, lastError, ...(digests.length ? { digests } : {}), ...(adjustments.length ? { adjustments } : {}) }
 }
+
+/* The Coach's looks at a running cycle, as the server hands them over (api/coach/adjust.js): one
+   correction once a cycle runs — a rep sooner on the first lift — so there is something to see
+   and to undo, and "the plan stands" each time one is asked for. */
+let looksAsked = 0
+function demoLooks(S) {
+  const c = S?.coach?.cycle
+  if (!c || !Array.isArray(c.routines)) return []
+  const out = []
+  const r = (S.routines || []).find(x => x.id === c.routines[0])
+  const e = r?.ex?.[0]
+  if (e && c.weeks >= 2) {
+    out.push({
+      id: 'demo-look-' + c.id, cycle: c.id, at: Date.now(), week: 1,
+      summary: t('Your last session went to plan, so the first lift moves up a rep sooner.'),
+      changes: [{ week: 2, routine: r.id, exId: e.id, reps: (e.reps || 8) + 2, why: t('Every set last time was made with reps to spare.') }]
+    })
+  }
+  for (let i = 1; i <= looksAsked; i++) out.push({ id: 'demo-asked-' + c.id + '-' + i, cycle: c.id, at: Date.now(), week: 1, manual: true, nochange: true, reading: t('Looked at your last session — the plan stands.') })
+  return out
+}
+export const demoAdjust = () => { looksAsked++; return { job: null } }
+export const demoLooksTaken = () => ({ ok: true })
 
 function start(kind, make) {
   if (job) throw Object.assign(new Error(t('The Coach is already thinking about your training.')), { status: 409 })

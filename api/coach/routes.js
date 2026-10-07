@@ -96,6 +96,20 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
       } catch (e) { failEnqueue(res, e); }
     },
 
+    // A look at the running cycle, asked for by hand: the same job the scheduler queues after a
+    // session, with a line of their own to go on if they wrote one.
+    'POST /api/coach/adjust': async (req, res) => {
+      const user = guard(req, res); if (!user) return;
+      const body = await readBody(req);
+      try {
+        const job = jobs.enqueue(user.id, {
+          kind: 'adjust', trigger: 'manual', lang: body.lang,
+          note: body.note ? String(body.note).slice(0, cfgStore.MAX_MESSAGE_LEN_CEILING) : null
+        });
+        json(res, 202, { job });
+      } catch (e) { failEnqueue(res, e); }
+    },
+
     // One workout, read closely. Nothing to apply — the card is kept in the user's log.
     'POST /api/coach/debrief': async (req, res) => {
       const user = guard(req, res); if (!user) return;

@@ -16,6 +16,9 @@ import { useWakeLock } from './lib/wakelock.js'
 import { installViewportGuard } from './lib/viewport-guard.js'
 import { installChipDrag } from './lib/hchips.js'
 import { syncPushSubscription } from './lib/push.js'
+import { cycleStale, projectCycle } from './lib/coach-cycle.js'
+import { syncCoachOnOpen } from './lib/coach-api.js'
+import { todayISO } from './lib/format.js'
 import { MOBILE } from './lib/mobile.js'
 import { exitWorkoutEdit, startFlow } from './sheets.jsx'
 import Icon from './components/Icon.jsx'
@@ -132,6 +135,16 @@ function Shell() {
     if (MOBILE || !user || !ready) return
     syncPushSubscription().catch(() => {})
   }, [user?.id, ready])
+  // A Coach plan that runs as a cycle (lib/coach-cycle.js): when the week has turned since the
+  // app was last open, this week's numbers go into the routines, and what the Coach corrected
+  // while it was closed is taken in — before a session is started from stale numbers.
+  const cycleId = S.coach?.cycle?.id || null
+  const today = todayISO()
+  useEffect(() => {
+    if (!ready || !cycleId) return
+    if (cycleStale(useStore.getState().S, today)) useStore.getState().update(s => { projectCycle(s, today) })
+    if (S.coach?.consent?.agreedAt) syncCoachOnOpen()
+  }, [ready, cycleId, today])
   // Opened from a device-link QR code (#95): once boot knows who is here, the sheet that redeems
   // it opens by itself — over the sign-in screen, or over the app for a guest or a signed-in
   // browser. Once per visit; closed, the code stays for the sign-in screen's own button.

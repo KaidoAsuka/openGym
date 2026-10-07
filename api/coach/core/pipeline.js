@@ -14,7 +14,7 @@ import { CONTRACT } from './payload.js';
 import { buildPrompt, buildPromptParts } from './prompt.js';
 import { SCHEMAS } from './schemas.js';
 import { extractJSON, contractOK } from './parse.js';
-import { validatePlan, validateReview, validateDebrief, validateDigest } from './validate.js';
+import { validatePlan, validateReview, validateDebrief, validateDigest, validateAdjust } from './validate.js';
 import { customBodyParts } from './plan-load.js';
 
 /**
@@ -23,7 +23,7 @@ import { customBodyParts } from './plan-load.js';
  * @returns {{ ok:true, nochange?:boolean, reading?:string, result?:object }
  *        | { ok:false, errorClass:string, detail?:string, repairable?:boolean, errors?:string[], raw?:string }}
  */
-export async function attemptOnce({ adapter, cfg, kind, payload, model, timeoutMs, invokeOpts = {} }, repair) {
+export async function attemptOnce({ adapter, cfg, kind, payload, model, timeoutMs, invokeOpts = {}, cycle = null }, repair) {
   // HTTP providers get the rules/payload split (prefix caching, schema-constrained decoding);
   // the runtime-backed CLIs still get one flat prompt — they have no message roles to split over.
   const parts = buildPromptParts(kind, payload, repair);
@@ -73,7 +73,11 @@ export async function attemptOnce({ adapter, cfg, kind, payload, model, timeoutM
       ? validateDebrief(parsed.value)
       : kind === 'digest'
         ? validateDigest(parsed.value)
-        : validatePlan(parsed.value, {
+        : kind === 'adjust'
+          // The cycle as it stood when the payload was built, which the caller hands over: the
+          // payload carries it for the model's reading, not in the shape a check needs.
+          ? validateAdjust(parsed.value, { cycle, ...limits, ownPlan: basis.ownPlan })
+          : validatePlan(parsed.value, {
       customIds,
       workingWeights: payload.history?.workingWeights,
       daysPerWeek: payload.coachProfile?.daysPerWeek,
@@ -81,7 +85,7 @@ export async function attemptOnce({ adapter, cfg, kind, payload, model, timeoutM
     });
 
   if (!checked.ok) return { ok: false, repairable: !repair, errors: checked.errors, raw: r.text, errorClass: 'unusable' };
-  if (checked.nochange) return { ok: true, nochange: true, reading: checked.reading };
+  if (checked.nochange) return { ok: true, nochange: true, reading: checked.reading, ...(checked.notes ? { notes: checked.notes } : {}) };
   return { ok: true, result: checked.proposal || { bundle: checked.bundle, summary: checked.bundle.summary } };
 }
 

@@ -13,6 +13,8 @@ import { t, getLang } from './i18n.js'
 import { useStore } from '../store/useStore.js'
 import { useUI } from '../store/useUI.js'
 import { freshDigests, adoptDigests } from './coach-digests.js'
+import { freshLooks, applyLooks } from './coach-cycle.js'
+import { appendChat } from './coach.js'
 
 const POLL_MS = 3000       // a job is running: often enough to feel live
 const IDLE_MS = 60000       // a Coach screen is open but nothing is running
@@ -71,6 +73,38 @@ function takeDigests(list) {
   if (!store.ready || !Array.isArray(list) || !freshDigests(store.S, list).length) return
   store.update(s => { adoptDigests(s, list) })
 }
+// The Coach's looks at the running cycle ride on the poll the same way, and are applied as
+// they arrive: a correction to the weeks still to come takes effect without being approved, and
+// the chat gets a line that shows what moved and can take it back (lib/coach-cycle.js). "Nothing
+// to change" is only said in the chat when the look was asked for.
+function takeLooks(list) {
+  const store = useStore.getState()
+  if (!store.ready || !Array.isArray(list)) return
+  const fresh = freshLooks(store.S, list)
+  if (fresh.length) {
+    store.update(s => {
+      for (const r of applyLooks(s, list)) {
+        if (!r.nochange) appendChat(s, { role: 'coach', kind: 'adjusted', ref: r.id, text: r.summary })
+        else if (r.manual) appendChat(s, { role: 'coach', kind: 'nochange', text: r.reading || t('Looked at your last session — the plan stands.') })
+      }
+    })
+  }
+  // Where there is no server to see the synced state, the looks are let go of by hand.
+  if (list.length && DEMO) demo().then(m => m.demoLooksTaken(list.map(a => a.id))).catch(() => {})
+  else if (list.length && LOCAL()) local().then(m => m.localLooksTaken(list.map(a => a.id))).catch(() => {})
+}
+/** Once when the app opens: take in what the Coach wrote while it was closed. The status poll
+ *  only runs on the Coach's own screen, and a corrected weight has to be there before the session
+ *  it is for, not after someone happens to open the chat. */
+export async function syncCoachOnOpen() {
+  try {
+    const s = await coachStatus()
+    takeDigests(s?.digests)
+    takeLooks(s?.adjustments)
+  } catch { /* the next open tries again */ }
+}
+const _requestAdjust = async note => DEMO ? (await demo()).demoAdjust(S()) : LOCAL() ? (await local()).localAdjust(S(), note) : api('/api/coach/adjust', { method: 'POST', body: JSON.stringify({ note: note || '', lang: getLang() }) })
+export const requestAdjust = (...a) => _requestAdjust(...a).then(track)
 const _requestReview = async note => DEMO ? (await demo()).demoReview(S()) : LOCAL() ? (await local()).localReview(S(), note) : api('/api/coach/review', { method: 'POST', body: JSON.stringify({ note: note || '', lang: getLang() }) })
 export const requestReview = (...a) => _requestReview(...a).then(track)
 const _requestPlan = async intake => DEMO ? (await demo()).demoPlan(S(), intake) : LOCAL() ? (await local()).localPlan(S(), intake) : api('/api/coach/plan', { method: 'POST', body: JSON.stringify({ intake, lang: getLang() }) })
@@ -119,6 +153,7 @@ export function useCoachStatus(active = true) {
     try {
       const s = await coachStatus()
       takeDigests(s?.digests)
+      takeLooks(s?.adjustments)
       // An answer that arrives after a newer request was sent is older than what that request
       // will bring: the idle poll in flight when a run is started must not land after the
       // refresh that follows the start, putting back the run count and last outcome from before.

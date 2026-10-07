@@ -85,6 +85,12 @@ if (kind === 'create') {
     // The first programme the payload offered, named back, so a test can tell it arrived.
     ...(P.programs?.candidates?.[0] ? { program: P.programs.candidates[0].id } : {}),
     week: { 1: 'r1', 3: 'r2', 5: 'r1' },
+    // Four weeks, the middle two with numbers of their own, so the phone has a cycle to run.
+    block: { weeks: 4, outline: 'Three weeks of adding a rep, then an easier one.' },
+    cycle: [
+      { week: 2, focus: 'A rep more on the first lift.', sessions: [{ routine: 'r1', ex: [{ id: ex(0).id, reps: 9 }] }] },
+      { week: 4, focus: 'An easier week.', sessions: [{ routine: 'r1', ex: [{ id: ex(0).id, sets: 2, reps: 8 }] }] }
+    ],
     routines: [
       {
         id: 'r1', name: 'Full body A', emoji: '💪', prog: 'linear', why: 'Compound-first, three sessions a week.',
@@ -118,6 +124,20 @@ if (kind === 'debrief') {
     highlights: done ? [`${done} working sets completed.`] : [],
     watch: (P.previous || []).length ? [] : ['First time this routine was logged — nothing to compare against yet.'],
     nextTime: ['Keep the same loads and add one rep where the last set had reps in reserve.']
+  });
+}
+
+// adjust: a look at the running cycle — one more rep on its first exercise from this week on,
+// echoing the week it was told it is, so a test can check the cycle arrived.
+if (kind === 'adjust') {
+  const c = P.cycle || {};
+  const s = c.plan?.[0]?.sessions?.[0];
+  const e = s?.ex?.[0];
+  if (!e) out({ coach_contract: 1, nochange: true, reading: 'Nothing in the cycle to change yet.' });
+  out({
+    coach_contract: 1,
+    summary: `Week ${c.week} of ${c.weeks}: every set was made, so the first lift takes a rep more.`,
+    changes: [{ week: c.week, routine: s.routine, exId: e.id, reps: (e.reps || 8) + 1, why: 'Every set of the last session hit its target.' }]
   });
 }
 

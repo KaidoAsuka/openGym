@@ -18,6 +18,7 @@ import { libraryHas, libraryName } from './library.js';
 import { glyphStr } from './glyphs.js';
 import { planLoadFindings, findingErrors, advisoriesOf, isHardFinding, changeLoadErrors, customBodyParts } from './plan-load.js';
 import { programCard } from './kb.js';
+import { cleanCyclePlan, cleanChanges, planAt, baseOf, withChanges, CYCLE_WEEKS_MAX, ADJUST_SUMMARY_MAX, ADJUST_NOTES_MAX } from './cycle.js';
 
 // The closed list (FR-23 / C3). Adding a member here is a deliberate act with an apply
 // implementation on the client to match; there is no default case anywhere.
@@ -256,6 +257,26 @@ export function validatePlan(data, ctx = {}) {
     ? { weeks: data.block.weeks, ...(isStr(data.block.outline) ? { outline: clampStr(data.block.outline, 600) } : {}) }
     : null;
 
+  // The weeks, when they are not all the same week (cycle.js): what each routine's exercises
+  // are done at in each week of the block — sets, reps and the weight. It runs as long as the
+  // block does; a cycle with no block is as long as its last week. Each week that has numbers is
+  // held to the same two counts as the plan itself, read with that week's numbers in place, so a
+  // plan cannot be inside the limits in week one and far outside them in week five.
+  let cycle = null;
+  // A revision is handed its previous plan, where `cycle` is the object this function made of
+  // the first answer; the weeks inside one read the same as a list of weeks.
+  const rawCycle = Array.isArray(data.cycle) ? data.cycle : Array.isArray(data.cycle?.plan) ? data.cycle.plan : [];
+  if (rawCycle.length) {
+    const listed = rawCycle.map(w => (w && Number.isInteger(w.week) ? w.week : 0));
+    const weeks = Math.min(CYCLE_WEEKS_MAX, block ? block.weeks : Math.max(1, ...listed));
+    const read = cleanCyclePlan(rawCycle, routines, weeks);
+    errors.push(...read.errors);
+    if (!read.errors.length && read.plan.length) {
+      cycle = { weeks, plan: read.plan };
+      if (!ctx.ownPlan) errors.push(...cycleLoadErrors(scheduled, baseOf(routines), read.plan, read.plan.filter(w => w.sessions).map(w => w.week), { sessionMin: ctx.sessionMin, custom }));
+    }
+  }
+
   if (errors.length) return fail(errors);
   return {
     ok: true,
@@ -269,6 +290,7 @@ export function validatePlan(data, ctx = {}) {
       ...(advisories.length ? { advisories } : {}),
       ...(differences.length ? { differences } : {}),
       ...(block ? { block } : {}),
+      ...(cycle ? { cycle } : {}),
       week, routines, customEx
     }
   };
@@ -656,6 +678,85 @@ function currentOf(type, routine, planned, plan, target) {
 }
 
 function fail(errors) { return { ok: false, errors }; }
+
+/* =============================== a cycle's weeks =============================== */
+
+/**
+ * What the weeks of a cycle ask for beyond the two counted limits, as errors for the repair
+ * round. A limit broken the same way in several weeks is reported once, for its worst week, with
+ * the other weeks named — six copies of one sentence help nobody fix it.
+ */
+function cycleLoadErrors(plan, base, cyclePlan, weeks, limits, before) {
+  const read = (cp, week) => {
+    const at = planAt(plan, base, cp, week);
+    return planLoadFindings(at, limits).filter(isHardFinding).map(f => ({
+      key: f.code + '|' + (f.bp || f.session.key), size: f.code === 'weekly-over' ? f.sets : f.minutes,
+      line: findingErrors(at, [f], limits.custom)[0]
+    }));
+  };
+  const worst = new Map();
+  for (const week of weeks) {
+    // With the weeks as they stood given, only what the new numbers made worse counts: a cycle
+    // its owner had already taken past a limit does not make every later correction unusable.
+    const was = before ? new Map(read(before, week).map(f => [f.key, f.size])) : null;
+    for (const f of read(cyclePlan, week)) {
+      if (was && was.get(f.key) >= f.size) continue;
+      const had = worst.get(f.key);
+      if (!had) worst.set(f.key, { ...f, week, also: [] });
+      else if (f.size > had.size) worst.set(f.key, { ...f, week, also: [...had.also, had.week] });
+      else had.also.push(week);
+    }
+  }
+  return [...worst.values()].map(x =>
+    `in week ${x.week} of the cycle${x.also.length ? ` (and in week${x.also.length > 1 ? 's' : ''} ${x.also.sort((a, b) => a - b).join(', ')})` : ''}, ${x.line}`);
+}
+
+/**
+ * Validate a daily look at a running cycle: changes to the numbers of weeks not yet trained.
+ *
+ * It can move sets, reps, seconds and weights of exercises the cycle's routines already hold,
+ * and reword what a week is for. It cannot add, remove or swap an exercise or move a day — those
+ * are a review's, and the person's to approve; `notes` is where it says one is called for.
+ *
+ * `ctx.cycle` is payload.js cycleContext: the cycle as it stands, with the week it is in.
+ * Returns { ok, nochange, reading } | { ok, proposal:{ summary, changes, focus, notes } } | { ok:false, errors }.
+ */
+export function validateAdjust(data, ctx = {}) {
+  if (!data || typeof data !== 'object') return fail(['the answer was not an object']);
+  const cyc = ctx.cycle;
+  if (!cyc) return fail(['no cycle is running, so there is nothing to adjust']);
+  const notes = (Array.isArray(data.notes) ? data.notes : []).filter(isStr).slice(0, ADJUST_NOTES_MAX).map(n => clampStr(n.trim(), 300));
+  const nothing = () => ({ ok: true, nochange: true, reading: clampStr(data.reading || data.summary || '', ADJUST_SUMMARY_MAX), ...(notes.length ? { notes } : {}) });
+  if (data.nochange) return nothing();
+  if (data.changes != null && !Array.isArray(data.changes)) return fail(['changes must be an array (or set "nochange": true with a "reading")']);
+  const read = cleanChanges(data, cyc, cyc.week);
+  const errors = [...read.errors];
+  // A change that sets what the week already holds is no change; all of them gone is "nothing
+  // to change", said honestly.
+  const numbers = new Map();
+  const at = n => { if (!numbers.has(n)) numbers.set(n, planAt({ routines: cyc.routines, week: cyc.schedule }, cyc.base, cyc.plan, n)); return numbers.get(n); };
+  const kept = read.changes.filter(c => {
+    const now = at(c.week).routines.find(r => r.id === c.routine)?.ex.find(e => e.id === c.exId) || {};
+    return ['sets', 'reps', 'sec', 'weight'].some(k => c[k] != null && Number(now[k] ?? 0) !== c[k]);
+  });
+  if (!errors.length && !ctx.ownPlan && kept.length) {
+    const weeks = [...new Set(kept.map(c => c.week))].sort((a, b) => a - b);
+    errors.push(...cycleLoadErrors({ routines: cyc.routines, week: cyc.schedule }, cyc.base, withChanges(cyc.plan, kept, []), weeks,
+      { sessionMin: ctx.sessionMin, custom: ctx.custom }, cyc.plan));
+  }
+  if (errors.length) return fail(errors);
+  if (!kept.length && !read.focus.length) return nothing();
+  if (!isStr(data.summary)) return fail(['summary is required — one or two sentences on what you saw in the log and what you changed']);
+  return {
+    ok: true,
+    proposal: {
+      summary: clampStr(data.summary.trim(), ADJUST_SUMMARY_MAX),
+      changes: kept,
+      ...(read.focus.length ? { focus: read.focus } : {}),
+      ...(notes.length ? { notes } : {})
+    }
+  };
+}
 
 /* =============================== workout debriefs =============================== */
 

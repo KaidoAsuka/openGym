@@ -12,6 +12,7 @@
 import * as jobs from './jobs.js';
 import * as cfgStore from './config.js';
 import { dueWeek } from './digest.js';
+import { dueLook } from './adjust.js';
 
 const TICK_MS = 60000;
 
@@ -128,6 +129,31 @@ export function queueDigest(uid, S, deps) {
 }
 
 /**
+ * The daily look at a running cycle (adjust.js): queue one when a session of the cycle has come
+ * in that has not been looked at. Like the weekly note it runs whatever the review cadence is,
+ * and does not wait for a proposal to be answered.
+ *
+ * @returns true when a look was queued, so the caller leaves this profile for the tick
+ */
+export function queueLook(uid, S, deps) {
+  jobs.releaseLooks(uid, S);
+  const tz = S.reminder?.tz || null;
+  const today = (tz && deps.userNow(tz)?.date) || new Date().toISOString().slice(0, 10);
+  const key = dueLook(S, jobs.readUser(uid), today);
+  if (!key) return false;
+  try {
+    jobs.enqueue(uid, { kind: 'adjust', trigger: 'scheduled' });
+    // Marked once it is queued, not once it succeeds: one look per session, whatever becomes of it.
+    jobs.markLooked(uid, key);
+    console.log('coach: daily look queued for', uid);
+    return true;
+  } catch (e) {
+    if (!(e instanceof jobs.CoachError)) throw e;
+    return false;
+  }
+}
+
+/**
  * @param {object} deps  { users(): [{id}], userNow(tz): {date,hhmm,weekday} }
  */
 export function startCadence(deps) {
@@ -146,6 +172,8 @@ export function startCadence(deps) {
         // The week's note comes before the review and does not wait for a proposal to be
         // answered: it is not one, and a review queued on a later tick then reads it.
         if (queueDigest(user.id, S, deps)) continue;
+        // Then the look at a session that just came in: the next session is trained from it.
+        if (queueLook(user.id, S, deps)) continue;
         if (st.pending) continue;
         // Reviewed means the model read those workouts and answered — with a proposal, with
         // "nothing to change", or with an answer that failed validation and was paid for all the

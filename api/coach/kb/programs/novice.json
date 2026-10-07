@@ -93,8 +93,9 @@
     "structure": "Three tiers a session: a main lift for 5 sets of 3 with the last set open (T1), a second lift for 3x10 (T2), an accessory for 3x15 with the last set open (T3). Four sessions rotate the main lifts: squat, overhead press, bench press, deadlift.",
     "progression": "Each session: bench and overhead press up 2.5 kg (5 lb), squat and deadlift 5 kg (10 lb). A T1 that misses its total moves to 6x2, then 10x1, before the load is reset from a new five-rep max; a T2 moves from 3x10 to 3x8 to 3x6. A T3 goes up when its open set reaches 25 reps.",
     "fit": "partial",
+    "cycle": true,
     "policy": "linear",
-    "adapt": "The app has no stage ladder: after repeated misses it takes about 10 % off instead of changing the set and rep scheme, so a stage change is a plan change made at a review. Run T1 at 5x3 and T2 at 3x10 on `linear`, T3 on `double`. The four sessions fit a four-day week as written; on three days only three of them can be scheduled.",
+    "adapt": "Written as a cycle, the stage ladder can be run: after a session that misses its total the coming sessions of that lift move to the next scheme (5x3 to 6x2 to 10x1; 3x10 to 3x8 to 3x6), and after the last stage the load is reset as the programme says. The four sessions fit a four-day week as written; on three days only three of them can be scheduled.",
     "caveats": "Well regarded. The failure ladder is the part people come to it for, and the part this app does not run.",
     "source": "https://thefitness.wiki/routines/gzclp/",
     "verified": "A"
@@ -113,8 +114,9 @@
     "structure": "Full body three times a week. Each main lift alternates a heavy day of 4x4 and a light day of 4x8 at about 90 % of the heavy load, the last set open-ended.",
     "progression": "Weekly steps: squat and deadlift 7.5 kg (15 lb), bench and row 5 kg (10 lb), overhead press 2.5 kg (5 lb). No formal deload; when last sets become maximal, narrow the rep range, and move on once several lifts stall.",
     "fit": "partial",
+    "cycle": true,
     "policy": "linear",
-    "adapt": "Put the heavy and the light day of a lift in different routines: the app progresses a lift separately in each routine, so the 90 % link between them is not kept. The weekly steps are aggressive; a smaller `inc` lasts longer.",
+    "adapt": "Put the heavy and the light day of a lift in different routines. Written as a cycle, the light day is kept at about 90 % of the heavy load each week. The weekly steps are aggressive; smaller ones last longer.",
     "caveats": "Written to fix the low upper-body frequency of Starting Strength and StrongLifts. Many do not get through the full table at its steps.",
     "source": "https://liftvault.com/programs/strength/ivysaur-spreadsheet/",
     "verified": "A"
@@ -153,8 +155,9 @@
     "structure": "Upper/lower split over four days. Two heavy days hold squat and deadlift, and bench press, at 3x6; the other two days use variations chosen for control, power or size.",
     "progression": "Main lifts go up every week until they stall; a stall takes about 7 kg (15 lb) off that lift, and after three resets the lift moves up every second week.",
     "fit": "partial",
+    "cycle": true,
     "policy": "linear",
-    "adapt": "The app adds load after every session a lift is trained rather than once a week, and resets by about 10 % rather than a fixed amount. Slowing a lift to every second week is not something the plan can carry.",
+    "adapt": "Written as a cycle, main lifts go up once a week as the programme has it, a stall takes its fixed amount off, and a lift that has been reset three times moves every second week.",
     "caveats": "Only the outline was checked against the source; the details come from a summary.",
     "source": "https://liftvault.com/programs/strength/jonnie-candito-linear-program-spreadsheet/",
     "verified": "B"

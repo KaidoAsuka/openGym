@@ -28,6 +28,7 @@ import { fetchFor } from './node-fetch.js';
 import { canDropPrivileges, unprivilegedIds } from './adapters/spawn.js';
 import { cohortForPayload, invalidate as invalidateCohort } from './cohort.js';
 import { keep as keepDigest, unfetched as unfetchedDigests } from './digest.js';
+import { keep as keepLook, unfetched as unfetchedLooks } from './adjust.js';
 
 // The prompt assembly, the plan fingerprint and the invoke→parse→validate→repair loop all
 // live in ./core now, where the phone can import them too. Re-exported so nothing that
@@ -50,7 +51,9 @@ const safe = uid => String(uid).replace(/[^a-zA-Z0-9_-]/g, '');
 const userFile = uid => path.join(COACH_DIR, safe(uid) + '.json');
 // `digests` are the weekly notes written while nobody was looking, held until the phone has taken
 // them into its own state (digest.js).
-const EMPTY = { daily: null, current: null, pending: null, history: [], digests: [] };
+// `adjustments` are the daily looks at a running cycle, held the same way (adjust.js), and
+// `adjustSeen` the last session one was made for.
+const EMPTY = { daily: null, current: null, pending: null, history: [], digests: [], adjustments: [], adjustSeen: null };
 
 export function readUser(uid) {
   try { return { ...EMPTY, ...JSON.parse(fs.readFileSync(userFile(uid), 'utf8')) }; }
@@ -100,6 +103,16 @@ export function releaseDigests(uid, S) {
   const left = unfetchedDigests(held, S);
   if (left.length !== held.length) patchUser(uid, { digests: left });
 }
+
+/** The same for the daily looks at a cycle: what the phone applied is no longer held for it. */
+export function releaseLooks(uid, S) {
+  const held = readUser(uid).adjustments || [];
+  const left = unfetchedLooks(held, S);
+  if (left.length !== held.length) patchUser(uid, { adjustments: left });
+}
+
+/** The scheduler looked at this session of the cycle; it is not looked at again. */
+export function markLooked(uid, key) { patchUser(uid, { adjustSeen: key }); }
 
 /** Every profile with a state file — the population a cohort is drawn from. */
 export function listUserIds() {
@@ -172,13 +185,18 @@ export function status(uid) {
     last: lastOutcome(rec),
     // Weekly notes the phone has not taken yet. The whole note, every poll, until the synced
     // state shows it arrived: taking one in is idempotent on the phone, and there are few.
-    ...(rec.digests?.length ? { digests: rec.digests } : {})
+    ...(rec.digests?.length ? { digests: rec.digests } : {}),
+    // Daily looks at the running cycle the phone has not applied yet, oldest first, handed over
+    // the same way (adjust.js).
+    ...(rec.adjustments?.length ? { adjustments: rec.adjustments } : {})
   };
 }
 function lastOutcome(rec) {
   // A weekly note is nobody's question, so how one ended is nobody's answer: the chat reads
   // `last` as the reply to what was asked, and a note written in between must not stand in for it.
-  const h = (rec.history || []).filter(e => e.kind !== 'digest').at(-1);
+  // A daily look is nobody's question either, unless they asked for one and it failed: then
+  // the chat has to be able to say so.
+  const h = (rec.history || []).filter(e => e.kind !== 'digest' && !(e.kind === 'adjust' && !(e.trigger === 'manual' && e.outcome === 'failed'))).at(-1);
   return h ? { id: h.id, kind: h.kind, outcome: h.outcome, errorClass: h.errorClass || null, at: h.at, ...(h.reading ? { reading: h.reading } : {}) } : null;
 }
 function archive(uid, rec, outcome) {
@@ -263,7 +281,7 @@ export function enqueue(uid, opts) {
     id: crypto.randomBytes(8).toString('hex'),
     uid,
     forgetSeq: forgetSeq.get(uid) || 0,
-    kind: opts.kind,                                  // 'create' | 'review' | 'debrief' | 'digest'
+    kind: opts.kind,                                  // 'create' | 'review' | 'debrief' | 'digest' | 'adjust'
     trigger: opts.trigger || 'manual',                // 'manual' | 'scheduled'
     workoutId: opts.workoutId ? String(opts.workoutId).slice(0, 40) : null,
     // The week a digest writes up, as the scheduler worked it out (digest.js dueWeek).
@@ -318,6 +336,7 @@ function finish(job, result) {
     current: null,
     pending: result.pending !== undefined ? result.pending : rec.pending,
     ...(result.digest ? { digests: keepDigest(rec.digests, result.digest) } : {}),
+    ...(result.look ? { adjustments: keepLook(rec.adjustments, result.look) } : {}),
     history
   });
   if (result.outcome === 'ready' && onProposal) {
@@ -353,6 +372,11 @@ async function execute(job) {
   if (job.kind === 'digest' && !(job.week && payloadLib.weekWorkouts(S, job.week.from, job.week.to).length)) {
     return finish(job, { outcome: 'failed', errorClass: 'noworkout' });
   }
+
+  // A daily look needs a cycle to look at; one that ended or was dropped since the tick that
+  // queued this is not an error anyone has to hear about.
+  const cycle = job.kind === 'adjust' ? payloadLib.cycleContext(S) : null;
+  if (job.kind === 'adjust' && !cycle) return finish(job, { outcome: 'failed', errorClass: 'nocycle' });
 
   const pendingCreate = job.refine ? readUser(job.uid).pending : null;
   const payload = payloadLib.build(S, {
@@ -392,7 +416,7 @@ async function execute(job) {
     if (ids) shareJobDir(jobDir, ids);
 
     const attempt = await runPipeline({
-      adapter, cfg, kind: job.kind, payload, model: cfgStore.modelFor(cfg), timeoutMs: TIMEOUT_MS,
+      adapter, cfg, kind: job.kind, payload, model: cfgStore.modelFor(cfg), timeoutMs: TIMEOUT_MS, cycle,
       // The HTTP adapters take the fetch and the abort signal they are given; the runtime
       // adapters ignore both.
       invokeOpts: { jobDir, env, fetch: fetchFor(TIMEOUT_MS), signal: ctl.signal }
@@ -401,6 +425,17 @@ async function execute(job) {
       // Cancelled by a forget, not failed by the provider: the log must not blame the job budget.
       const errorClass = ctl.signal.aborted ? 'forgotten' : attempt.errorClass;
       return finish(job, { outcome: 'failed', errorClass, detail: attempt.detail });
+    }
+    if (job.kind === 'adjust') {
+      // Not a proposal: the phone applies it when it next looks, and whatever is waiting in
+      // `pending` stays there. "Nothing to change" is kept too — it is what the Coach said about
+      // the session, and the cycle's own screen shows it.
+      const look = {
+        id: job.id, at: Date.now(), cycle: S.coach.cycle.id, week: cycle.week,
+        ...(job.trigger === 'manual' ? { manual: true } : {}),
+        ...(attempt.nochange ? { nochange: true, reading: attempt.reading || '', ...(attempt.notes ? { notes: attempt.notes } : {}) } : attempt.result)
+      };
+      return finish(job, { outcome: attempt.nochange ? 'nochange' : 'kept', look });
     }
     if (attempt.nochange) {
       return finish(job, { outcome: 'nochange', pending: null, detail: null, reading: attempt.reading });

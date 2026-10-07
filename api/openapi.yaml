@@ -2561,6 +2561,42 @@ paths:
         '429': { $ref: '#/components/responses/CoachRefused' }
         '503': { $ref: '#/components/responses/CoachOff' }
 
+  /api/coach/adjust:
+    post:
+      tags: [coach]
+      operationId: postCoachAdjust
+      summary: Ask for a look at the running cycle
+      description: |
+        Queues an `adjust` job: the Coach reads the latest sessions against the weeks of the
+        cycle still to come, and moves their sets, reps and weights where the log says to.
+        The scheduler queues the same job by itself after a session of the cycle is synced.
+        The answer is not a proposal: it is handed out as `adjustments` on the status poll
+        and the client applies it to its own state, where it can be undone. With no cycle
+        running the job fails with `nocycle`.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note:
+                  type: string
+                  description: Something the lifter wants taken into account, in their own words.
+                lang:
+                  type: string
+                  pattern: '^[A-Za-z]{2,3}([-_][A-Za-z0-9]{2,8})?$'
+                  description: |
+                    The language the app is showing, which the Coach writes in. Absent or not a
+                    language tag, the profile's stored `lang` is used.
+      responses:
+        '202': { $ref: '#/components/responses/CoachJobQueued' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/CoachRefused' }
+        '409': { $ref: '#/components/responses/CoachRefused' }
+        '429': { $ref: '#/components/responses/CoachRefused' }
+        '503': { $ref: '#/components/responses/CoachOff' }
+
   /api/coach/pending/resolve:
     post:
       tags: [coach]
@@ -3685,6 +3721,16 @@ components:
             there are none. The same notes are sent on every poll until a state that carries
             them in `coach.digests` has been synced; taking one in twice changes nothing.
           items: { $ref: '#/components/schemas/CoachDigest' }
+        adjustments:
+          type: array
+          description: |
+            Daily looks at the running cycle that the profile's synced state has not applied
+            yet, oldest first. Absent when there are none. Each is sent on every poll until a
+            state that lists its `id` in `coach.cycle.applied` has been synced. One with
+            `nochange` carries only what the Coach said; the others carry `changes` to the
+            numbers of weeks not yet trained — `week`, `routine`, `exId`, any of `sets`,
+            `reps`, `sec`, `weight`, and `why`.
+          items: { type: object, additionalProperties: true }
 
     CoachDigest:
       type: object
@@ -3771,6 +3817,13 @@ components:
                 author: { type: string }
                 source: { type: string, description: Where the catalogue entry comes from. }
             own: { type: boolean, description: "True when the intake carried a plan of the person's own and the Coach laid that out." }
+            cycle:
+              type: object
+              description: >-
+                The weeks of the block when they are not all the same week: `weeks`, and
+                `plan` with, for each week, what it is for and each routine's exercises at
+                that week's sets, reps and weight. Absent on a plan that repeats one week.
+              additionalProperties: true
             advisories:
               type: array
               description: >-

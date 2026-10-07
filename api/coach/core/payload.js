@@ -13,7 +13,8 @@
 import { glyphStr } from './glyphs.js';
 import { LIBRARY, LIB_BY_ID, libraryHas, libraryName, librarySlice, isStretch, MAX_LIBRARY } from './library.js';
 import { planLoadForPayload, customBodyParts } from './plan-load.js';
-import { programsForPayload } from './kb.js';
+import { programsForPayload, programBrief } from './kb.js';
+import { cleanCyclePlan, numbersAt, cycleWeekOn, CYCLE_WEEKS_MAX, CYCLE_FOCUS_MAX } from './cycle.js';
 
 export const CONTRACT = 1;
 // Bounds from FR-22. A review reads a training block, not a training career: more history
@@ -863,6 +864,164 @@ export function digestsOf(coach, held) {
   return [...byWeek.values()].sort((a, b) => a.from.localeCompare(b.from));
 }
 
+/* ---------- what a lift is at ----------
+   A cycle sets the weight of each session, and a weight is set from what the person can do. That
+   is arithmetic over the log — the heaviest recent sets, an estimated one-rep max, what the last
+   session of the lift looked like — and it is done here, so the model starts from numbers it
+   was given and a programme's "80 % of your max" has a max to be 80 % of.
+
+   The estimate is Epley's, as the app's own (frontend/src/lib/onerm.js): weight × (1 + reps/30),
+   from sets of twelve reps or fewer, where it holds. Nothing is stored for it. */
+export const LIFTS_MAX = 40;
+export const LIFT_WEEKS = 12;
+const LIFT_SETS = 6;
+const half = n => Math.round(n * 2) / 2;
+
+/**
+ * @param {object} S       the synced state
+ * @param {Set} [only]     exercise ids to keep (a running cycle's own); all trained ones otherwise
+ * @returns one entry per exercise with a loaded set in the last twelve weeks, most trained first
+ */
+function lifts(S, only) {
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - LIFT_WEEKS * 7);
+  const from = iso(cutoff);
+  const nameOf = exNamer(S);
+  const by = new Map();
+  for (const w of list(S.workouts)) {
+    const d = day(w?.d);
+    if (!d || d < from) continue;
+    for (const en of entriesOf(w)) {
+      const id = ident(en.id);
+      if (id == null || (only && !only.has(id))) continue;
+      const done = setsOf(en).filter(s => s.done && !isWarmupSet(s) && Number(s.w) > 0 && Number(s.r) > 0);
+      if (!done.length) continue;
+      const it = by.get(id) || { id, sessions: 0, e1rm: 0, best: null, last: null };
+      it.sessions++;
+      for (const s of done) {
+        const est = Number(s.r) <= 12 ? Number(s.w) * (1 + Number(s.r) / 30) : 0;
+        if (est > it.e1rm) { it.e1rm = est; it.best = { d, set: fmtSet(cleanSet(s)) }; }
+      }
+      // Workouts are kept oldest first, so the last one seen is the latest.
+      it.last = { d, sets: done.slice(0, LIFT_SETS).map(s => fmtSet(cleanSet(s))) };
+      by.set(id, it);
+    }
+  }
+  return [...by.values()]
+    .sort((a, b) => b.sessions - a.sessions)
+    .slice(0, LIFTS_MAX)
+    .map(it => ({ id: it.id, name: nameOf(it.id), sessions: it.sessions, ...(it.e1rm ? { e1rm: half(it.e1rm), best: it.best } : {}), last: it.last }));
+}
+
+/* ---------- the cycle that is running ----------
+   `S.coach.cycle` is what the phone keeps of a cycle it took on (frontend/src/lib/coach-cycle.js):
+   the routines it runs on, what those held when it began, and the weeks. It is client-written
+   state like the rest, so it is read by name and by type, against the plan as it stands — a
+   routine or an exercise the plan no longer has is not part of the cycle any more. */
+export const CYCLE_AHEAD = 6;
+export const ADJUST_WINDOW_DAYS = 21;
+export const ADJUST_SESSIONS = 8;
+const CYCLE_HISTORY = 3;
+
+/** The cycle as kept, checked against the cleaned plan; null when none is running. */
+function cycleState(S, coach, plan) {
+  const c = coach.cycle;
+  if (!c || typeof c !== 'object') return null;
+  const startedAt = day(c.startedAt);
+  const weeks = count(c.weeks, 1, CYCLE_WEEKS_MAX);
+  const routines = list(c.routines).map(ident).filter(id => list(plan.routines).some(r => r.id === id));
+  if (!startedAt || !weeks || !routines.length) return null;
+  const mine = list(plan.routines).filter(r => routines.includes(r.id));
+  const base = {};
+  for (const r of mine) {
+    base[r.id] = {};
+    const kept = c.base && typeof c.base === 'object' && c.base[r.id] && typeof c.base[r.id] === 'object' ? c.base[r.id] : {};
+    for (const e of r.ex) {
+      const b = kept[e.id] && typeof kept[e.id] === 'object' ? kept[e.id] : {};
+      const o = {};
+      for (const k of ['sets', 'reps', 'sec', 'weight']) if (typeof b[k] === 'number' && Number.isFinite(b[k]) && b[k] > 0) o[k] = b[k];
+      base[r.id][e.id] = o;
+    }
+  }
+  const { plan: weeksPlan } = cleanCyclePlan(c.plan, mine, weeks);
+  const program = c.program && typeof c.program === 'object' && typeof c.program.id === 'string'
+    ? { id: c.program.id.slice(0, ID_MAX), name: word(c.program.name, NAME_MAX) } : null;
+  const history = list(c.history).filter(h => h && typeof h === 'object').slice(-CYCLE_HISTORY).map(h => ({
+    on: stamp(h.at), summary: text(h.summary, 300), changes: list(h.changes).length, ...(h.undone === true ? { undone: true } : {})
+  }));
+  const check = c.lastCheck && typeof c.lastCheck === 'object' && text(c.lastCheck.reading, 300).trim()
+    ? { on: stamp(c.lastCheck.at), reading: text(c.lastCheck.reading, 300).trim() } : null;
+  return {
+    name: word(c.name, NAME_MAX), startedAt, weeks, routines, base, plan: weeksPlan,
+    program, own: c.own === true, history, lastCheck: check
+  };
+}
+
+/**
+ * The cycle as a job reads it.
+ *
+ * `full`: the daily look — every week from the current one on, for the next few with each
+ * routine's exercises at the numbers that week trains them at, and the rest as a line of intent.
+ * Otherwise a review's short view: how long, which week, what each week is for.
+ */
+function cycleForPayload(cyc, plan, today, { full }) {
+  const at = cycleWeekOn(cyc.startedAt, today);
+  const week = Math.min(cyc.weeks, Math.max(1, at || 1));
+  const o = {
+    ...(cyc.name ? { name: cyc.name } : {}),
+    weeks: cyc.weeks, week, startedAt: cyc.startedAt,
+    // The last week has been and gone: the cycle is over and what follows is theirs to ask for.
+    ...(at && at > cyc.weeks ? { over: true } : {}),
+    ...(cyc.program?.name ? { program: cyc.program.name } : {}),
+    ...(cyc.own ? { own: true } : {})
+  };
+  const focusOf = n => cyc.plan.find(w => w.week === n)?.focus || null;
+  const mine = list(plan.routines).filter(r => cyc.routines.includes(r.id));
+  const weekdaysOf = rid => Object.keys(plan.week || {}).map(Number).filter(d => [].concat(plan.week[d]).includes(rid));
+  if (!full) {
+    o.routines = mine.map(r => r.id);
+    o.focus = cyc.plan.filter(w => w.focus).map(w => ({ week: w.week, focus: w.focus }));
+    return o;
+  }
+  o.routines = mine.map(r => ({ id: r.id, name: r.name || null, weekdays: weekdaysOf(r.id) }));
+  o.plan = [];
+  for (let n = week; n <= Math.min(cyc.weeks, week + CYCLE_AHEAD - 1); n++) {
+    const numbers = numbersAt(cyc.base, cyc.plan, n);
+    o.plan.push({
+      week: n, ...(focusOf(n) ? { focus: focusOf(n) } : {}),
+      sessions: mine.map(r => ({
+        routine: r.id,
+        ex: r.ex.map(e => {
+          const x = numbers.get(r.id)?.get(e.id) || {};
+          // `set` is the week that last gave this exercise a number; absent, it stands as the
+          // routine held it when the cycle began.
+          return { id: e.id, name: e.name, ...(x.sets != null ? { sets: x.sets } : {}), ...(x.reps != null ? { reps: x.reps } : {}), ...(x.sec != null ? { sec: x.sec } : {}), ...(x.weight != null ? { weight: x.weight } : {}), ...(x.set ? { set: x.set } : {}) };
+        })
+      }))
+    });
+  }
+  const later = [];
+  for (let n = week + CYCLE_AHEAD; n <= cyc.weeks; n++) if (focusOf(n)) later.push({ week: n, focus: focusOf(n).slice(0, CYCLE_FOCUS_MAX) });
+  if (later.length) o.later = later;
+  if (cyc.history.length) o.adjusted = cyc.history;
+  if (cyc.lastCheck) o.lastCheck = cyc.lastCheck;
+  return o;
+}
+
+/** What a daily answer is checked against (pipeline.js): the cycle's length, its routines with
+ *  their exercises, and the week it is in. Null when no cycle is running. */
+export function cycleContext(S, today) {
+  const coach = S.coach || {};
+  const plan = cleanPlan(S);
+  const cyc = cycleState(S, coach, plan);
+  if (!cyc) return null;
+  const at = cycleWeekOn(cyc.startedAt, day(today) || iso(new Date()));
+  return {
+    weeks: cyc.weeks, week: Math.max(1, at || 1), base: cyc.base, plan: cyc.plan,
+    routines: list(plan.routines).filter(r => cyc.routines.includes(r.id)),
+    schedule: plan.week
+  };
+}
+
 /**
  * Build a job payload.
  *
@@ -880,7 +1039,7 @@ export function build(S, opts = {}) {
   const profile = opts.intake || coach.profile || null;
   const p = {
     coach_contract: CONTRACT,
-    task: opts.kind === 'review' ? 'review' : opts.kind === 'debrief' ? 'debrief' : opts.kind === 'digest' ? 'digest' : 'create',
+    task: opts.kind === 'review' ? 'review' : opts.kind === 'debrief' ? 'debrief' : opts.kind === 'digest' ? 'digest' : opts.kind === 'adjust' ? 'adjust' : 'create',
     meta: {
       profile: opts.handle,
       // Both are short codes in any real state; cut anyway, since the state is the client's.
@@ -908,7 +1067,7 @@ export function build(S, opts = {}) {
     .flatMap(e => (e.decisions || []).filter(d => d.status === 'rejected').map(d => ({ type: word(d.type, PROFILE_WORD_MAX), why: text(d.why, PROFILE_TEXT_MAX.notes) })))
     .slice(-15);
   // A note on a week proposes nothing, so there is nothing for it to propose again.
-  if (declined.length && opts.kind !== 'digest') p.previouslyDeclined = declined;
+  if (declined.length && opts.kind !== 'digest' && opts.kind !== 'adjust') p.previouslyDeclined = declined;
 
   if (opts.kind === 'digest') {
     // One week, read whole: every session in full, the stall and mark picture as it stood on
@@ -934,6 +1093,32 @@ export function build(S, opts = {}) {
       const before = digestsOf(coach, opts.digests).filter(g => g.to < week.from).slice(-3);
       if (before.length) p.digests = before;
     }
+  } else if (opts.kind === 'adjust') {
+    // The daily look at a cycle that is running: the weeks still to train as they stand, what
+    // was trained lately, what each lift is at, and the programme the cycle follows, so every
+    // weight can be held against that programme's own arithmetic. No library — a look changes
+    // numbers, never exercises.
+    const cyc = cycleState(S, coach, p.plan);
+    if (cyc) {
+      p.cycle = cycleForPayload(cyc, p.plan, p.meta.today, { full: true });
+      const entry = cyc.program?.id ? programBrief(cyc.program.id) : null;
+      if (entry) p.program = entry;
+    } else p.cycle = null;
+    const since = new Date(); since.setDate(since.getDate() - ADJUST_WINDOW_DAYS);
+    const recent = list(S.workouts).filter(w => w && day(w.d) && day(w.d) >= iso(since)).slice(-ADJUST_SESSIONS);
+    const detailFrom = Math.max(0, recent.length - FULL_DETAIL_SESSIONS);
+    p.window = {
+      from: day(recent[0]?.d), to: day(recent[recent.length - 1]?.d),
+      workouts: [...recent.slice(0, detailFrom).map(compactWorkout), ...recent.slice(detailFrom).map(cleanWorkout)]
+    };
+    p.aggregates = aggregates(S, recent);
+    const inCycle = new Set(list(p.plan.routines).filter(r => cyc?.routines.includes(r.id)).flatMap(r => r.ex.map(e => e.id)));
+    const facts = lifts(S, inCycle);
+    if (facts.length) p.lifts = facts;
+    const seen = observations(S, inCycle);
+    if (seen) p.observations = seen;
+    p.bodyweight = { goal: num(S.targetW) ?? null, series: weighIns(S, iso(since), null) };
+    if (opts.note) p.userNote = String(opts.note).slice(0, MAX_NOTE_CHARS);
   } else if (opts.kind === 'debrief') {
     // One session, read closely: the workout itself, the last few times the same routine was
     // trained, and the stall picture for the exercises in it. No library — a debrief changes
@@ -997,6 +1182,10 @@ export function build(S, opts = {}) {
     // What they marked on exercises, counted over twelve weeks rather than over the window.
     const seen = observations(S);
     if (seen) p.observations = seen;
+    // A cycle that is running sets the sets, reps and weights week by week; a review reads that
+    // it is there and where it stands, and leaves those numbers to it.
+    const cyc = cycleState(S, coach, p.plan);
+    if (cyc) p.cycle = cycleForPayload(cyc, p.plan, p.meta.today, { full: false });
     if (opts.note) p.userNote = String(opts.note).slice(0, MAX_NOTE_CHARS);
     if (opts.cohort) p.cohort = cleanCohort(opts.cohort);
     // A review names mostly what is already trained; 60 candidates is plenty for a swap.
@@ -1021,6 +1210,9 @@ export function build(S, opts = {}) {
         workingWeights: Object.entries(best).map(([id, w]) => ({ id: ident(id), name: libraryName(id), best: w }))
       };
     }
+    // What each lift they have trained is at, worked out here, for the weights a cycle sets.
+    const facts = lifts(S, null);
+    if (facts.length) p.lifts = facts;
     // A new plan should not bring back what was marked as painful or disliked on the old one.
     const seen = observations(S);
     if (seen) p.observations = seen;
@@ -1038,6 +1230,8 @@ export function build(S, opts = {}) {
       p.userNote = String(opts.refine).slice(0, MAX_NOTE_CHARS);
     }
   }
+  // A weekly note and a session's debrief read no conversation; a daily look does, because
+  // what they typed to the Coach yesterday is part of how they are doing.
   if (opts.kind !== 'debrief' && opts.kind !== 'digest') {
     const said = conversation(coach, [opts.note, opts.refine]);
     if (said.length) p.conversation = said;

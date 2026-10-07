@@ -13,8 +13,9 @@
     "structure": "One big exercise for a body part done for ten sets of ten, starting at about 60 % of a max with about a minute's rest, and a little accessory work after it.",
     "progression": "When all ten sets reach ten reps, add 4-5 % next time; until then the load stays.",
     "fit": "partial",
+    "cycle": true,
     "policy": "linear",
-    "adapt": "`linear` adds load once every set is complete, as the method does, but after repeated misses the app takes about 10 % off where the method simply holds. The one-minute rest is advice; the plan does not carry rest times.",
+    "adapt": "Written as a cycle, the load is held until all ten sets reach ten reps and then raised, as the method has it. The one-minute rest is advice; the plan does not carry rest times.",
     "caveats": "A short push for size: very high volume and little strength gain. Only the outline was checked.",
     "source": "https://www.liftosaur.com/programs/german-volume-training",
     "verified": "B"
@@ -33,8 +34,9 @@
     "structure": "One set of twenty squats with a ten-rep-max load, breathing between reps, three times a week, with a few basic upper-body lifts.",
     "progression": "At least 2.5 kg (5 lb) more on the squat every session for six weeks, with no rule for a miss, and then it ends.",
     "fit": "partial",
+    "cycle": true,
     "policy": "linear",
-    "adapt": "`linear` adds the step after every completed set of twenty. After repeated misses the app takes about 10 % off, which the programme has no place for: by its own rules a run of misses means it is over.",
+    "adapt": "Written as a six-week cycle with the squat load rising every session; the three days are three routines when their loads differ. A run of misses means the programme is over, by its own rules.",
     "caveats": "Known for how hard it is. The book's claim of 30 lb of muscle in six weeks is not realistic. Only the outline was checked.",
     "source": "https://liftvault.com/programs/strength/super-squats-program-spreadsheet-20-rep-squats/",
     "verified": "B"

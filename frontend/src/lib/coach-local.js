@@ -85,7 +85,8 @@ async function bumpDaily() {
 export async function localStatus() {
   const d = await loadCoachDevice()
   if (d.pending && d.pending.expiresAt && d.pending.expiresAt < Date.now()) await saveCoachDevice({ pending: null })
-  return { job, pending: (await loadCoachDevice()).pending || null, cap: await capState(), lastError, last }
+  const now = await loadCoachDevice()
+  return { job, pending: now.pending || null, cap: await capState(), lastError, last, ...(now.adjustments?.length ? { adjustments: now.adjustments } : {}) }
 }
 
 export const localReview = (S, note) => start(S, 'review', { note: note ? String(note).slice(0, 1000) : null })
@@ -96,8 +97,18 @@ export const localRefine = async (S, text) => {
   return start(S, 'create', { refine: String(text || '').slice(0, 1000), previous: pendingCreate?.bundle || null, iteration: (pendingCreate?.iteration || 1) + 1 })
 }
 export const localDebrief = (S, workoutId) => start(S, 'debrief', { workoutId: workoutId || null })
+// A look at the running cycle. A phone has no scheduler, so this is the only way one happens
+// here: asked for from the cycle's own screen.
+export const localAdjust = (S, note) => start(S, 'adjust', { note: note ? String(note).slice(0, 1000) : null })
+/** The looks the app has applied are no longer held for it. */
+export async function localLooksTaken(ids) {
+  const d = await loadCoachDevice()
+  const left = (d.adjustments || []).filter(a => !ids.includes(a.id))
+  if (left.length !== (d.adjustments || []).length) await saveCoachDevice({ adjustments: left })
+  return { ok: true }
+}
 export async function localResolve() { await saveCoachDevice({ pending: null }); return { ok: true } }
-export async function localForget() { job = null; lastError = null; await saveCoachDevice({ pending: null, daily: null }); return { ok: true } }
+export async function localForget() { job = null; lastError = null; await saveCoachDevice({ pending: null, daily: null, adjustments: [] }); return { ok: true } }
 
 export async function localDisclosure() {
   const d = await loadCoachDevice()
@@ -145,8 +156,16 @@ async function run(S, kind, opts, d, adapter) {
     handle: await handle(), kind, intake: opts.intake, note: opts.note, refine: opts.refine, previous: opts.previous, workoutId: opts.workoutId,
     lang: getLang()   // what the app shows, which a profile that never picked a language does not store (#303)
   })
+  // A look needs a cycle to look at, and its answer is checked against that cycle.
+  const cycle = kind === 'adjust' ? payloadLib.cycleContext(S) : null
+  if (kind === 'adjust' && !cycle) {
+    lastError = { errorClass: 'nocycle', detail: null }
+    last = { id: job.id, kind, outcome: 'failed', errorClass: 'nocycle', at: Date.now() }
+    if (notify) notify({ kind: 'failed', errorClass: 'nocycle', detail: null })
+    return
+  }
   const attempt = await runPipeline({
-    adapter, cfg: cfgOf(d), kind, payload,
+    adapter, cfg: cfgOf(d), kind, payload, cycle,
     model: d.model || HTTP_PROVIDERS[d.provider].defaultModel, timeoutMs: timeoutFor(d.provider),
     invokeOpts: { env: envOf(d, key), fetch: nativeFetch }
   })
@@ -159,6 +178,16 @@ async function run(S, kind, opts, d, adapter) {
     lastError = { errorClass: attempt.errorClass, detail }
     last = { id: job.id, kind, outcome: 'failed', errorClass: attempt.errorClass, at: Date.now() }
     if (notify) notify({ kind: 'failed', errorClass: attempt.errorClass, detail })
+    return
+  }
+  if (kind === 'adjust') {
+    // Not a proposal: kept until the app has applied it (lib/coach-cycle.js), then let go of.
+    const look = {
+      id: job.id, at: Date.now(), cycle: S.coach.cycle.id, week: cycle.week, manual: true,
+      ...(attempt.nochange ? { nochange: true, reading: attempt.reading || '' } : attempt.result)
+    }
+    const held = (await loadCoachDevice()).adjustments || []
+    await saveCoachDevice({ adjustments: [...held, look].slice(-14) })
     return
   }
   if (attempt.nochange) {

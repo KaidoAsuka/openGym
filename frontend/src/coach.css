@@ -171,6 +171,25 @@
 .pcard-basis a{color:var(--acc)}
 .pcard-differs .pcard-differs-h{font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--label-2);padding-bottom:2px}
 .pcard-differs .pcard-differs-f{font-size:12px;color:var(--label-3);padding-bottom:6px}
+/* a cycle: the weeks, one under the other, each opening to what its sessions are done at */
+.cyc{padding:2px 18px 8px}
+.cyc-wrap{padding-left:0;padding-right:0}
+.cyc-wrap .pcard-differs-h{padding:0 18px 2px}
+.cyc-w{border-top:var(--hair) solid var(--sep)}
+.cyc-w:first-child{border-top:none}
+.cyc-h{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:baseline;width:100%;padding:10px 0;text-align:left}
+.cyc-n{font-size:14px;font-weight:600;white-space:nowrap}
+.cyc-n em{font-style:normal;font-size:11px;font-weight:600;margin-left:6px;padding:2px 7px;border-radius:99px;background:var(--acc-soft);color:var(--acc)}
+.cyc-f{font-size:13px;color:var(--label-2);line-height:1.4;min-width:0}
+.cyc-c{font-size:12px;color:var(--label-3);transition:transform var(--fast)}
+.cyc-c.on{transform:rotate(90deg)}
+.cyc-b{padding:0 0 10px}
+.cyc-r{font-size:12px;color:var(--label-3);padding-bottom:6px}
+.cyc-s{padding:4px 0 6px}
+.cyc-s-n{font-size:13px;font-weight:600;padding-bottom:2px}
+.cyc-e{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--label-2);padding:2px 0}
+.cyc-e span:first-child{text-transform:capitalize;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cyc-e span:last-child{white-space:nowrap;font-variant-numeric:tabular-nums}
 
 /* composer */
 .composer{

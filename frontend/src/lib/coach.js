@@ -19,6 +19,7 @@ import { mergePlan } from './plan-share.js'
 import { deleteRoutine } from './routines.js'
 import { POLICIES } from './progression.js'
 import { adoptBlock } from './coach-charter.js'
+import { adoptCycle } from './coach-cycle.js'
 import { t, tn } from './i18n.js'
 
 // Bumping this re-prompts everyone: it means what we share, or who we share it with, changed.
@@ -280,6 +281,8 @@ export function revertLast(s) {
   s.week = clone(snap.week)
   // Snapshots taken before this field existed have nothing to put back.
   if (snap.dayPlanRestore) Object.assign(s.dayPlan, snap.dayPlanRestore)
+  // The plan whose weeks were running is gone with its routines; so is its cycle.
+  if (c.cycle && c.cycle.id === snap.proposalId) c.cycle = null
   appendLog(s, { kind: 'revert', at: Date.now(), proposalId: snap.proposalId, summary: t('Reverted the last Coach changes.') })
   return true
 }
@@ -337,6 +340,7 @@ function trim(s) {
     if ((c.chat || []).length > 8) c.chat.shift()
     // The oldest weekly notes go before a snapshot does: a review reads twelve of them.
     else if ((c.digests || []).length > 12) c.digests.shift()
+    else if ((c.cycle?.history || []).length > 1) c.cycle.history.shift()
     else if ((c.snapshots || []).length > 1) c.snapshots.shift()
     else if ((c.log || []).length > 1) c.log.shift()
     else break
@@ -415,6 +419,7 @@ export function applyCreatedPlan(s, proposal, { schedule } = {}) {
     routines: bundle.routines.map(r => ({ ...r, why: undefined, ex: r.ex.map(e => ({ ...e, why: undefined, name: undefined })) })),
     customEx: (bundle.customEx || []).map(c => { const { url, media, ...rest } = c || {}; return rest })
   }
+  const had = (s.routines || []).length
   const res = mergePlan(s, stripped, { schedule })
   // Only when the week actually moved — with the switch off the old schedule still stands, and
   // so do the reschedules made against it.
@@ -422,6 +427,9 @@ export function applyCreatedPlan(s, proposal, { schedule } = {}) {
   // And only then does a block start: routines taken without their week are not yet the plan
   // being trained, so the block the charter is counting stays the one that is.
   if (schedule) adoptBlock(s, bundle.block)
+  // And only then do its weeks become the cycle that runs (lib/coach-cycle.js) — or, for a plan
+  // that repeats one week, end the cycle that ran before it.
+  if (schedule) adoptCycle(s, bundle, s.routines.slice(had), proposal.id)
   res.logId = appendLog(s, {
     kind: 'create', at: Date.now(), proposalId: proposal.id,
     summary: proposal.summary || '', routines: res.routines, iteration: proposal.iteration || 1,

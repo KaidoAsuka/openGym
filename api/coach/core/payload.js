@@ -1000,9 +1000,14 @@ export function build(S, opts = {}) {
     if (opts.note) p.userNote = String(opts.note).slice(0, MAX_NOTE_CHARS);
     if (opts.cohort) p.cohort = cleanCohort(opts.cohort);
     // A review names mostly what is already trained; 60 candidates is plenty for a swap.
-    p.library = librarySlice(S, p.coachProfile?.equipment, { keep: trainedIds(S, workouts), max: 60 });
+    p.library = librarySlice(S, p.coachProfile?.equipment, { keep: trainedIds(S, workouts), max: 60, texts: [opts.note] });
   } else {
-    p.library = librarySlice(S, p.coachProfile?.equipment, { keep: trainedIds(S, S.workouts || []) });
+    // What they named in their own plan, their likes or the message they just sent is looked up
+    // in the catalogue, so the exercises they asked for are there to be chosen.
+    p.library = librarySlice(S, p.coachProfile?.equipment, {
+      keep: trainedIds(S, S.workouts || []),
+      texts: [p.coachProfile?.ownPlan, p.coachProfile?.likes, opts.refine, opts.note]
+    });
     // Creation for a returning user: what they have actually handled, so proposed baselines
     // start from evidence rather than optimism (B2/FR-20).
     const best = {};

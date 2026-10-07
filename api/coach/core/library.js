@@ -6,6 +6,8 @@
  * needs an import attribute, and this file has to load under both without either knowing.
  */
 import { EXERCISES } from './library-data.js';
+import { COMMON_IDS } from './common-data.js';
+import { exerciseHints, takeTurns } from './exercise-hints.js';
 
 export const LIBRARY = EXERCISES;
 export const LIB_BY_ID = new Map(LIBRARY.map(e => [e.id, e]));
@@ -56,7 +58,31 @@ const LANE_WEIGHT = {
 };
 const laneWeight = bp => LANE_WEIGHT[bp] ?? 1;
 
-export function librarySlice(S, equipment, { keep = [], max = MAX_LIBRARY } = {}) {
+/* ---------- which rows of a lane come first ----------
+   A lane used to be filled in the catalogue's own order, and the catalogue is sorted by name.
+   So "assisted", "band" and "barbell" took every slot: with barbell, dumbbell, cable, machines
+   and body weight all ticked, 99 of the 160 candidates were barbell exercises and one was a
+   dumbbell exercise, out of 294. No pull-up, no dumbbell bench press, no leg press — a plan with
+   any of them could not be built, and a person's own plan came back with substitutes.
+
+   Two things order a lane now. The exercises people actually train come first: the ones another
+   widely used logger ships as its built-in list (common-data.js, generated from the import map
+   the app already keeps for that logger's exports). And within each of the two groups the
+   equipment kinds take turns, so no kind can use up a lane before the next one is reached. Both
+   are fixed orders, so the slice is still the same every time. */
+const COMMON = new Set(COMMON_IDS);
+export const isCommon = e => COMMON.has(e && e.id);
+
+const laneOrder = list => [...takeTurns(list.filter(isCommon)), ...takeTurns(list.filter(e => !isCommon(e)))];
+
+/**
+ * @param {object} S             the synced state (for the person's own exercises)
+ * @param {string[]} equipment   what they said they can train with; empty means everything
+ * @param {object} [opts]        `keep`: ids that travel whatever the cap or the filter;
+ *                               `texts`: what they typed, read for the movements it names;
+ *                               `max`: the cap
+ */
+export function librarySlice(S, equipment, { keep = [], max = MAX_LIBRARY, texts = [] } = {}) {
   const wanted = (equipment || []).map(x => String(x).toLowerCase());
   // A custom exercise's name and body part are whatever the person typed, and its id is
   // whatever the client wrote; all three ride into every prompt. Cut to the bounds payload.js
@@ -76,6 +102,8 @@ export function librarySlice(S, equipment, { keep = [], max = MAX_LIBRARY } = {}
   const base = lifts.length ? lifts : equipped;
 
   const pinned = new Set(keep.filter(id => LIB_BY_ID.has(id)));
+  // A movement they named in their own words has to be there to be chosen (exercise-hints.js).
+  exerciseHints(texts, base, isCommon, LIBRARY.filter(e => !isStretch(e))).forEach(id => pinned.add(id));
   const out = [];
   const taken = new Set();
   const add = e => { if (!taken.has(e.id)) { taken.add(e.id); out.push(e); } };
@@ -86,12 +114,12 @@ export function librarySlice(S, equipment, { keep = [], max = MAX_LIBRARY } = {}
   } else {
     // Weighted round-robin across body parts, so a 292-row "upper arms" cannot crowd out a
     // 37-row "lower arms" and a 37-row "lower arms" cannot claim as much room as "chest";
-    // order within a body part is the catalogue's own. Lanes are visited in sorted key order
+    // order within a body part is laneOrder's. Lanes are visited in sorted key order
     // and each takes its weight per pass, so the slice stays deterministic.
     const groups = new Map();
     for (const e of base) { if (!groups.has(e.bp)) groups.set(e.bp, []); groups.get(e.bp).push(e); }
     const keys = [...groups.keys()].sort();
-    const lanes = keys.map(k => groups.get(k));
+    const lanes = keys.map(k => laneOrder(groups.get(k)));
     const weights = keys.map(laneWeight);
     const cursor = lanes.map(() => 0);
     let progressed = true;

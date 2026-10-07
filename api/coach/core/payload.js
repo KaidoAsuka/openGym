@@ -13,6 +13,7 @@
 import { glyphStr } from './glyphs.js';
 import { LIBRARY, LIB_BY_ID, libraryHas, libraryName, librarySlice, isStretch, MAX_LIBRARY } from './library.js';
 import { planLoadForPayload, customBodyParts } from './plan-load.js';
+import { programsForPayload } from './kb.js';
 
 export const CONTRACT = 1;
 // Bounds from FR-22. A review reads a training block, not a training career: more history
@@ -46,7 +47,7 @@ export const MAX_PAYLOAD_CHARS = 300_000;
    payload, to the limits the intake screen shows (CoachIntake.jsx). The system prompt already
    reads this text as data rather than instruction (common rule 3); the bound is about size.
    A field of the wrong type reads as absent rather than as "[object Object]". */
-export const PROFILE_TEXT_MAX = { limitations: 600, likes: 300, dislikes: 300, notes: 600 };
+export const PROFILE_TEXT_MAX = { limitations: 600, likes: 300, dislikes: 300, notes: 600, ownPlan: 1500 };
 // Goal and experience are enum words today (strength, returning, ...); 40 leaves room for new
 // ones without letting either carry a paragraph.
 export const PROFILE_WORD_MAX = 40;
@@ -104,7 +105,10 @@ function cleanProfile(profile) {
     limitations: text(profile.limitations, PROFILE_TEXT_MAX.limitations),
     likes: text(profile.likes, PROFILE_TEXT_MAX.likes),
     dislikes: text(profile.dislikes, PROFILE_TEXT_MAX.dislikes),
-    notes: text(profile.notes, PROFILE_TEXT_MAX.notes)
+    notes: text(profile.notes, PROFILE_TEXT_MAX.notes),
+    // A plan they want to train, in their words. Absent rather than empty when they wrote none:
+    // its presence is what tells a job the plan is theirs (create.md, validate.js).
+    ...(text(profile.ownPlan, PROFILE_TEXT_MAX.ownPlan).trim() ? { ownPlan: text(profile.ownPlan, PROFILE_TEXT_MAX.ownPlan).trim() } : {})
   };
 }
 
@@ -552,7 +556,11 @@ function recentChanges(S, coach) {
     if (e.dismissed) continue;
     const reverted = e.proposalId != null && undone.has(e.proposalId) ? { reverted: true } : {};
     if (e.kind === 'create') {
-      out.push({ on: stamp(e.at), type: 'new-plan', name: word(e.bundle?.name, NAME_MAX), why: text(e.summary, CHANGE_WHY_CHARS), ...reverted });
+      // What the plan was built from, as the phone kept it (coach.js lightBundle): a catalogue
+      // programme by its name, or their own plan.
+      const from = e.bundle && typeof e.bundle === 'object' ? e.bundle : {};
+      const basis = { ...(word(from.program?.name, NAME_MAX) ? { program: word(from.program.name, NAME_MAX) } : {}), ...(from.own === true ? { own: true } : {}) };
+      out.push({ on: stamp(e.at), type: 'new-plan', name: word(e.bundle?.name, NAME_MAX), ...basis, why: text(e.summary, CHANGE_WHY_CHARS), ...reverted });
       continue;
     }
     if (e.kind !== 'review') continue;
@@ -1011,6 +1019,11 @@ export function build(S, opts = {}) {
     // A new plan should not bring back what was marked as painful or disliked on the old one.
     const seen = observations(S);
     if (seen) p.observations = seen;
+    // Programmes from the catalogue (kb.js): the ones that fit the intake answers, or the ones
+    // their own plan names. Chosen by code from answers already in `coachProfile`, so this adds
+    // nothing about the person that the payload did not hold.
+    const programs = programsForPayload(p.coachProfile);
+    if (programs) p.programs = programs;
     if (opts.refine && opts.previous) {
       p.refine = { text: String(opts.refine).slice(0, MAX_NOTE_CHARS), previous: opts.previous };
     } else if (opts.refine) {

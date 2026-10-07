@@ -82,6 +82,8 @@ if (kind === 'create') {
     basedOn: P.refine?.previous
       ? 'Refined from the plan you were shown.'
       : 'No training history yet, so starting conservatively.',
+    // The first programme the payload offered, named back, so a test can tell it arrived.
+    ...(P.programs?.candidates?.[0] ? { program: P.programs.candidates[0].id } : {}),
     week: { 1: 'r1', 3: 'r2', 5: 'r1' },
     routines: [
       {

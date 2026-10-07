@@ -71,6 +71,10 @@ export const CREATE_SCHEMA = {
     name: STR,
     summary: STR,
     basedOn: STR,
+    // The catalogue programme the plan was built from, by id, and — for a plan the person brought
+    // themselves — where it departs from the principles. Both optional.
+    program: STR,
+    differences: { type: 'array', maxItems: 6, items: { type: 'string' } },
     // How long the plan runs before it is looked at whole, and what those weeks are for. Flat,
     // and optional: a plan without one is still a plan.
     block: { type: 'object', properties: { weeks: { type: 'integer' }, outline: STR } },

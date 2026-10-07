@@ -357,6 +357,16 @@ describe('CoachIntake — the answers themselves', () => {
       limitations: 'dodgy left shoulder', likes: 'deadlifts', dislikes: 'lunges', notes: 'arms by spring'
     })
   })
+
+  it('a plan they want to follow is the last box, and lands in the profile as typed', () => {
+    mount(); walkTo('Almost there')
+    const boxes = all('.ob-field textarea')
+    expect(boxes).toHaveLength(4)
+    expect(boxes[3].maxLength).toBe(1500)
+    typeIn(boxes[3], 'PHUL, with front squats')
+    cont()
+    expect(mocks.S.coach.profile.ownPlan).toBe('PHUL, with front squats')
+  })
 })
 
 describe('CoachIntake — building the plan', () => {

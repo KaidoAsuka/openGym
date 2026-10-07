@@ -1244,6 +1244,22 @@ export const PT_BR_OVERRIDES = {
   'What moved forward': 'O que avançou',
   'What got in the way': 'O que atrapalhou',
   'Writing up last week…': 'Escrevendo a nota da semana passada…',
+  // Coach: a plan built from a catalogue programme or from their own, and what the app notes about it
+  'A plan you want to follow': 'Um plano que você quer seguir',
+  'e.g. “Push/pull/legs, six days, the way I ran it last year: …”': 'ex.: “Empurrar/puxar/pernas, seis dias, como fiz no ano passado: …”',
+  'Name a programme or describe your own. The Coach lays it out as you wrote it and notes where it differs from the usual advice.': 'Indique um programa ou descreva o seu. O Treinador o organiza como você escreveu e aponta onde ele se afasta das recomendações habituais.',
+  'My plan: {0}': 'Meu plano: {0}',
+  'Built from your own plan': 'Montado a partir do seu próprio plano',
+  'Your own plan, after {0}': 'Seu próprio plano, segundo {0}',
+  'Based on {0}': 'Baseado em {0}',
+  'Source': 'Fonte',
+  'Where this differs from the usual advice': 'Onde isso se afasta das recomendações habituais',
+  'Worth knowing': 'Vale saber',
+  'Noted, not blocked — it is your plan.': 'Anotado, não bloqueado — o plano é seu.',
+  'Weekly sets for {0}: {1} — above the usual ceiling of {2}.': 'Séries semanais de {0}: {1} — acima do limite habitual de {2}.',
+  'Weekly sets for {0}: {1} — below the usual minimum of {2}.': 'Séries semanais de {0}: {1} — abaixo do mínimo habitual de {2}.',
+  '{0}: about {1} min by the app’s estimate — over the {2} min you set.': '{0}: cerca de {1} min pela estimativa do app — acima dos {2} min que você definiu.',
+  '{0}: {1} sets for {2} in one session — more than the usual {3}.': '{0}: {1} séries de {2} em uma sessão — mais do que as {3} habituais.',
 }
 
 export default { ...pt, ...PT_BR_OVERRIDES }

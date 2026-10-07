@@ -165,6 +165,12 @@
 .pcard-chg-stale{font-size:12px;color:var(--yellow);margin-top:4px}
 .pcard-notes{padding:10px 18px 4px;border-top:var(--hair) solid var(--sep)}
 .pcard-notes div{font-size:13px;color:var(--label-2);line-height:1.45;padding:4px 0}
+/* what a created plan was built from, and where it departs from the usual advice */
+.pcard-basis{font-size:13px}
+.pcard-basis b{font-weight:600;color:var(--label)}
+.pcard-basis a{color:var(--acc)}
+.pcard-differs .pcard-differs-h{font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--label-2);padding-bottom:2px}
+.pcard-differs .pcard-differs-f{font-size:12px;color:var(--label-3);padding-bottom:6px}
 
 /* composer */
 .composer{

@@ -32,6 +32,7 @@ import { insightsFor, sessionInsights } from '../lib/coach-insights.js'
 import { charterLine, addDays } from '../lib/coach-charter.js'
 import CharterSheet from './CoachCharter.jsx'
 import DigestsSheet from './CoachDigests.jsx'
+import CoachPlanNotes, { PlanBasis } from '../components/CoachPlanNotes.jsx'
 import { useCoachStatus, requestReview, requestDebrief, requestPlan, refinePlan, resolvePending, cohortStats, setCohortShare, jobErrorText, awaitedJob, settleAwaited, JOB_ERRORS } from '../lib/coach-api.js'
 import { confirmSheet } from '../sheets.jsx'
 import Icon from '../components/Icon.jsx'
@@ -341,6 +342,7 @@ function PlanCard({ p, S, update, toast, nav, refresh }) {
         <div className="pcard-eyebrow">{p.iteration > 1 ? t('Revision {0}', p.iteration) : t('Your plan')}</div>
         <h2 className="pcard-h">{b.name || t('Coach plan')}</h2>
         {!!b.summary && <p className="pcard-sum">{b.summary}</p>}
+        <PlanBasis bundle={b} />
         {!!b.basedOn && <p className="pcard-sum" style={{ fontSize: 13 }}>{b.basedOn}</p>}
         {!!b.block?.weeks && <p className="pcard-sum" style={{ fontSize: 13 }}>
           <b>{t('{0}-week block · checkpoint {1}', b.block.weeks, fmtDate(addDays(todayISO(), b.block.weeks * 7)))}</b>
@@ -355,6 +357,8 @@ function PlanCard({ p, S, update, toast, nav, refresh }) {
       </div>}
 
       {r && <RoutineBlock r={r} unit={S.unit} speedUnit={speedUnitOf(S)} />}
+
+      <CoachPlanNotes bundle={b} />
 
       <div className="pcard-row">
         <span className="lrow-m"><span className="lrow-t">{t('Use this weekly schedule')}</span><span className="lrow-s">{t('Replaces your current week. Days this plan leaves empty become rest days.')}</span></span>
@@ -654,6 +658,7 @@ function ProposalDetail({ entry, S }) {
         {b.routines.map((x, i) => <button key={x.id || i} className={'pcard-tab' + (i === tab ? ' on' : '')} onClick={() => setTab(i)}><Icon name={glyphOf(x.emoji)} />{x.name}</button>)}
       </div>}
       {r && <RoutineBlock r={r} unit={S.unit} speedUnit={speedUnitOf(S)} />}
+      <PlanBasis bundle={b} />
       <p className="pcard-sum" style={{ fontSize: 13 }}>{entry.scheduled ? t('Your week was set to this schedule.') : t('Imported without changing your week.')}</p>
     </>}
     {kind === 'create' && !b && <p className="pcard-sum">{t('This plan was imported before the app kept proposals; only its summary is left.')}</p>}

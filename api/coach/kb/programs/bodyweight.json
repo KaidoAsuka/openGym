@@ -1,0 +1,22 @@
+[
+  {
+    "id": "bwf-recommended-routine",
+    "name": "r/bodyweightfitness Recommended Routine",
+    "aliases": ["recommended routine", "bodyweightfitness", "bwf rr"],
+    "author": "the r/bodyweightfitness community",
+    "level": "novice to intermediate",
+    "goals": ["general", "muscle", "strength", "fatloss"],
+    "experience": ["new", "returning"],
+    "days": [3],
+    "needs": ["body weight"],
+    "weeks": null,
+    "structure": "The same full-body session three times a week: three pairs done in alternation (a pull-up and a squat progression, a dip and a hinge progression, a row and a push-up progression) for three sets of 5-8 each, then three core exercises for 3x8-12.",
+    "progression": "Choose the hardest variation that allows three sets of five and add reps each session; at three sets of eight, move to the next variation and start again at five.",
+    "fit": "close",
+    "policy": "double",
+    "adapt": "The pairs are supersets (`sg`). Between reviews the app adds reps, and sets once a rep ceiling (`repsMax`) is reached; moving on to the next harder variation is an exercise swap, made at a review.",
+    "caveats": "The usual place to start bodyweight training. The legs run out of resistance and later need added load or a gym. Only the outline was checked, and no deload is defined.",
+    "source": "https://www.liftosaur.com/programs/recommended-routine",
+    "verified": "B"
+  }
+]

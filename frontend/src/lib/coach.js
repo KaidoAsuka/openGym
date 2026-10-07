@@ -305,6 +305,12 @@ export function lightBundle(b) {
   if (!b) return null
   return {
     name: b.name || '', summary: b.summary || '', week: { ...(b.week || {}) },
+    // What the plan was built from: the catalogue programme by id, name and link, and whether
+    // it was their own plan. A later review is told (api/coach/core/payload.js recentChanges).
+    ...(b.program && typeof b.program === 'object' && b.program.name
+      ? { program: { id: b.program.id, name: String(b.program.name).slice(0, 80), ...(b.program.author ? { author: String(b.program.author).slice(0, 80) } : {}), ...(b.program.source ? { source: String(b.program.source).slice(0, 200) } : {}) } }
+      : {}),
+    ...(b.own === true ? { own: true } : {}),
     routines: (b.routines || []).map(r => ({
       id: r.id, name: r.name, emoji: r.emoji || '', why: r.why || '',
       ex: (r.ex || []).map(e => ({
@@ -385,6 +391,7 @@ export function profileLines(p) {
   if (p.likes) lines.push(t('Likes: {0}', p.likes))
   if (p.dislikes) lines.push(t('Avoid: {0}', p.dislikes))
   if (p.notes) lines.push(p.notes)
+  if (p.ownPlan) lines.push(t('My plan: {0}', p.ownPlan))
   return lines
 }
 

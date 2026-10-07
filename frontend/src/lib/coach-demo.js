@@ -113,6 +113,11 @@ function buildPlan(S, intake) {
       opengym_plan: 1, name: t('Coach plan'),
       summary: t('A two-day rotation across three sessions a week, built around the equipment you listed. Compounds first, one pull for every press, and enough overlap between the days that nothing goes two weeks without being trained.'),
       basedOn: (S.workouts || []).length ? t('Based on the training already in this demo profile.') : t('No training history yet, so starting conservatively.'),
+      // What a real plan carries from the validator (lib/coach-plan-notes.js): the programme it
+      // names, or that it is their own, and what the app counted. Two days of three sets leave
+      // the arms under four sets a week, which is exactly what the note is for.
+      ...(intake?.ownPlan ? { own: true } : { program: { id: 'fierce-5', name: 'Fierce 5', author: 'davisj3537 (bodybuilding.com forum)', source: 'https://liftvault.com/programs/bodybuilding/fierce-5-beginner-bodybuilding-program-spreadsheet/' } }),
+      advisories: [{ code: 'weekly-under', bp: 'upper arms', sets: 3, min: 4 }],
       week, routines, customEx: []
     }
   }

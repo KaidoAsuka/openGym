@@ -3760,6 +3760,28 @@ components:
             name: { type: string, maxLength: 40 }
             summary: { type: string }
             basedOn: { type: string }
+            program:
+              type: object
+              description: >-
+                The catalogue programme the plan was built from, read from the catalogue
+                rather than from the model's answer. Absent when it was built from none.
+              properties:
+                id: { type: string }
+                name: { type: string }
+                author: { type: string }
+                source: { type: string, description: Where the catalogue entry comes from. }
+            own: { type: boolean, description: "True when the intake carried a plan of the person's own and the Coach laid that out." }
+            advisories:
+              type: array
+              description: >-
+                Counts the app made about the plan, for the card to word: a body part over
+                its weekly ceiling or under four sets, a day over the session length, a body
+                part over its share of one session. A code and its numbers.
+              items: { type: object }
+            differences:
+              type: array
+              description: "For a plan of the person's own: the Coach's lines on where it departs from the principles."
+              items: { type: string }
             week: { type: object }
             routines: { type: array, items: { type: object } }
             customEx: { type: array, items: { type: object } }
@@ -3788,6 +3810,7 @@ components:
         sessionMin: { type: integer, description: Minutes per session. }
         equipment: { type: array, items: { type: string } }
         limitations: { type: string, description: Injuries and anything to work around. }
+        ownPlan: { type: string, maxLength: 1500, description: "A plan the person wants to follow, in their own words. With it the Coach lays that plan out instead of designing one." }
       additionalProperties: true
 
     CoachCohort:

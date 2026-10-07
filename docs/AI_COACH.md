@@ -357,6 +357,29 @@ brings a body part or a day down is always allowed. A review's payload carries t
 counted (`planLoad`), so the model starts from the app's numbers. There is no floor: a plan that
 leaves a body part out is yours to ask for.
 
+**Programmes, and a plan of your own.** A model asked for a plan names programmes from memory,
+and its memory of one is a blend of every forum post about it. So seventy-nine established
+programmes are written down in `api/coach/kb/programs/` — each with its layout, its progression
+rule, how much of it this app can run (`close`, `partial` or `none`), what people hold against
+it, a source and how far the entry was checked against that source. When you ask for a plan,
+`api/coach/core/kb.js` picks at most six that fit your goal, experience, days and equipment, and
+the model may build from one of them or from none. A plan may only name a programme it was
+handed: the card then shows the catalogue's own name and link, never the model's. Programmes
+that fit your answers but need something the app does not have — a training max, weeks that
+differ — are named to the model as well, to mention and not to build, so that a plan is never
+passed off as 5/3/1 without its rules.
+
+The last box of the intake takes a plan you want to follow, in your own words. With it filled in
+the job changes: the Coach lays your plan out and does not replace it. A programme you name is
+looked up in the catalogue whatever its fit, so its rules come from the entry. The two counted
+limits above stop being refusals for such a plan and become notes on the card ("Weekly sets for
+Chest: 24 — above the usual ceiling of 20"), next to the Coach's own lines on where the plan
+departs from the principles. Two more counts are only ever notes, on any new plan: a body part
+trained for fewer than four sets a week, and one given more than half its weekly ceiling in a
+single session. Everything that is not a count holds as before — exercise ids, the week,
+starting weights, and anything you told the Coach about an injury. A later review is told the
+plan was yours and does not propose changes whose only reason is a range.
+
 A rejected answer gets **one** repair round, with the errors handed back verbatim. Two failures
 is a provider problem rather than a prompting problem, and a retry loop against a paid account
 is a bad way to find that out.

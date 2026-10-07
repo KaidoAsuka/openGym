@@ -29,6 +29,13 @@ export const WEEKLY_SETS_MAX = {
   chest: 20, shoulders: 20, back: 30, 'upper arms': 30, 'upper legs': 40,
   'lower legs': 20, waist: 20, 'lower arms': 20, neck: 20
 };
+// Two more numbers from the same prompt, which are never an error: a plan under or over them is
+// still a plan, and its owner is told (planLoadFindings). A body part that is trained at all
+// should get this many sets a week (V1) —
+export const WEEKLY_SETS_MIN = 4;
+// — and not more in one session than about ten for a muscle group (V3), which by body part is
+// half of what the week allows it.
+export const SESSION_SETS_MAX = Object.fromEntries(Object.entries(WEEKLY_SETS_MAX).map(([bp, n]) => [bp, n / 2]));
 // Minutes one set costs with its rest: a straight set, and a set of an exercise paired into a
 // superset. create.md has always told the model "roughly 2-3 minutes per straight set".
 export const SET_MINUTES = 2.5;
@@ -99,6 +106,12 @@ function routineLoad(routine, custom) {
  *   its `key`, the routine ids trained, `sets` and whole `minutes`
  */
 export function planLoad(plan, custom) {
+  const load = count(plan, custom);
+  return { weeklySets: load.weeklySets, sessions: load.sessions.map(({ byPart, ...s }) => s) };
+}
+
+// `planLoad`, with each session's sets by body part kept beside its totals.
+function count(plan, custom) {
   const routines = new Map(list(plan?.routines).filter(r => r && typeof r === 'object').map(r => [r.id, r]));
   const loads = new Map([...routines].map(([id, r]) => [id, routineLoad(r, custom)]));
   const weeklySets = {};
@@ -110,18 +123,22 @@ export function planLoad(plan, custom) {
     if (!ids.length) continue;
     let sets = 0;
     let minutes = 0;
+    const byPart = {};
     ids.forEach(id => {
       const l = loads.get(id);
       scheduled.add(id);
       sets += l.sets;
       minutes += l.minutes;
-      for (const bp in l.byPart) weeklySets[bp] = (weeklySets[bp] || 0) + l.byPart[bp];
+      for (const bp in l.byPart) {
+        weeklySets[bp] = (weeklySets[bp] || 0) + l.byPart[bp];
+        byPart[bp] = (byPart[bp] || 0) + l.byPart[bp];
+      }
     });
-    sessions.push({ key: 'day:' + d, weekday: d, routines: ids, sets, minutes: Math.round(minutes) });
+    sessions.push({ key: 'day:' + d, weekday: d, routines: ids, sets, minutes: Math.round(minutes), byPart });
   }
   // A routine no weekday holds is still a session someone can start.
   for (const [id, l] of loads) {
-    if (!scheduled.has(id)) sessions.push({ key: 'routine:' + id, routines: [id], sets: l.sets, minutes: Math.round(l.minutes) });
+    if (!scheduled.has(id)) sessions.push({ key: 'routine:' + id, routines: [id], sets: l.sets, minutes: Math.round(l.minutes), byPart: l.byPart });
   }
   return { weeklySets: Object.fromEntries(Object.entries(weeklySets).map(([bp, n]) => [bp, round1(n)])), sessions };
 }
@@ -260,30 +277,93 @@ const sessionName = (plan, s) => {
 
 const setsOver = minutes => Math.max(1, Math.ceil(minutes / SET_MINUTES));
 
+/* ---------- where a plan sits outside the principles, as facts ----------
+   The same count read four ways, each a code and the numbers behind it, with nothing worded:
+
+     weekly-over        a body part over its weekly ceiling (V2)
+     session-over       a training day over the session length the person gave (V6)
+     weekly-under       a body part trained, but under WEEKLY_SETS_MIN a week (V1)
+     session-part-over  a body part over SESSION_SETS_MAX in one session (V3)
+
+   The first two are what a plan the Coach designed is rejected for. For a plan the person brought
+   themselves all four are notes: it is their plan, and what they are owed is the count, not a
+   refusal (validate.js). The repair round reads them as English sentences (findingErrors); a plan
+   card reads them as they are and words them in the reader's language (advisoriesOf). */
+export const HARD_FINDINGS = ['weekly-over', 'session-over'];
+export const isHardFinding = f => HARD_FINDINGS.includes(f.code);
+
+export function planLoadFindings(plan, { sessionMin, custom } = {}) {
+  const load = count(plan, custom);
+  const out = [];
+  for (const [bp, max] of Object.entries(WEEKLY_SETS_MAX)) {
+    const n = load.weeklySets[bp] || 0;
+    if (n > max) out.push({ code: 'weekly-over', bp, sets: n, max });
+  }
+  const cap = numOf(sessionMin);
+  if (cap) {
+    load.sessions.forEach(s => {
+      if (s.minutes > cap) out.push({ code: 'session-over', session: s, sets: s.sets, minutes: s.minutes, cap });
+    });
+  }
+  for (const bp of Object.keys(WEEKLY_SETS_MAX)) {
+    const n = load.weeklySets[bp] || 0;
+    if (n > 0 && n < WEEKLY_SETS_MIN) out.push({ code: 'weekly-under', bp, sets: n, min: WEEKLY_SETS_MIN });
+  }
+  load.sessions.forEach(s => {
+    for (const [bp, max] of Object.entries(SESSION_SETS_MAX)) {
+      const n = s.byPart[bp] || 0;
+      if (n > max) out.push({ code: 'session-part-over', session: s, bp, sets: n, max });
+    }
+  });
+  return out;
+}
+
+/** The hard findings as errors for the repair round: the count, the limit, where the sets come
+ *  from and what to take out. */
+export function findingErrors(plan, findings, custom) {
+  return findings.filter(isHardFinding).map(f => (f.code === 'weekly-over'
+    ? `the plan gives "${f.bp}" ${f.sets} work sets a week, over the ${f.max} the app allows a body part (principle V2) — `
+      + `they come from ${sourcesOf(plan, f.bp, custom)}. Take at least ${Math.ceil(f.sets - f.max)} of those sets out: fewer sets on an exercise, or one exercise less`
+    : `${sessionName(plan, f.session)} comes to about ${f.minutes} minutes by the app's estimate (${f.sets} sets; principle V6 gives the arithmetic), `
+      + `over the ${f.cap} minutes this person has for a session — take out about ${setsOver(f.minutes - f.cap)} sets, or pair exercises as supersets with "sg"`));
+}
+
 /**
  * What a new plan asks for beyond the limits, as errors for the repair round; none when it is
  * inside them. `sessionMin` is the intake's session length, and without one no duration is held.
  */
 export function planLoadErrors(plan, { sessionMin, custom } = {}) {
-  const load = planLoad(plan, custom);
-  const errors = [];
-  for (const [bp, max] of Object.entries(WEEKLY_SETS_MAX)) {
-    const n = load.weeklySets[bp] || 0;
-    if (n > max) {
-      errors.push(`the plan gives "${bp}" ${n} work sets a week, over the ${max} the app allows a body part (principle V2) — `
-        + `they come from ${sourcesOf(plan, bp, custom)}. Take at least ${Math.ceil(n - max)} of those sets out: fewer sets on an exercise, or one exercise less`);
-    }
+  return findingErrors(plan, planLoadFindings(plan, { sessionMin, custom }), custom);
+}
+
+// A card has room for a handful; a plan with more than this to say about it has a summary for that.
+export const ADVISORIES_MAX = 12;
+const ROUTINE_NAMES_MAX = 80;
+
+/**
+ * Findings as a bundle carries them to the plan card: the code, the body part, the numbers, and
+ * which session — the weekdays the week schedules it on, and the names of its routines. A routine
+ * trained on two days is one note with both days, not the same sentence twice.
+ * frontend/src/lib/coach-plan-notes.js words them; coach-plan-notes.test.js pins the two together.
+ */
+export function advisoriesOf(plan, findings) {
+  const nameOf = id => list(plan?.routines).find(r => r.id === id)?.name || String(id);
+  const out = [];
+  const seen = new Map();
+  for (const f of findings) {
+    const o = { code: f.code };
+    if (f.bp) o.bp = f.bp;
+    if (f.session) o.routine = f.session.routines.map(nameOf).join(' + ').slice(0, ROUTINE_NAMES_MAX);
+    for (const k of ['sets', 'max', 'min', 'minutes', 'cap']) if (f[k] != null) o[k] = f[k];
+    const day = f.session?.weekday;
+    const key = f.session ? [f.code, f.bp, f.session.routines.join('+'), f.sets, f.minutes].join('|') : null;
+    const same = key && seen.get(key);
+    if (same) { if (day != null) same.weekdays = [...(same.weekdays || []), day]; continue; }
+    if (day != null) o.weekdays = [day];
+    if (key) seen.set(key, o);
+    out.push(o);
   }
-  const cap = numOf(sessionMin);
-  if (cap) {
-    load.sessions.forEach(s => {
-      if (s.minutes > cap) {
-        errors.push(`${sessionName(plan, s)} comes to about ${s.minutes} minutes by the app's estimate (${s.sets} sets; principle V6 gives the arithmetic), `
-          + `over the ${cap} minutes this person has for a session — take out about ${setsOver(s.minutes - cap)} sets, or pair exercises as supersets with "sg"`);
-      }
-    });
-  }
-  return errors;
+  return out.slice(0, ADVISORIES_MAX);
 }
 
 /**

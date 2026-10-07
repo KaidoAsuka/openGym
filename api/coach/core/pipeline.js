@@ -64,6 +64,9 @@ export async function attemptOnce({ adapter, cfg, kind, payload, model, timeoutM
   // What the two counted limits are held against (principles V2, V6): the session length the
   // person gave, and the body part of each exercise the catalogue does not know.
   const limits = { sessionMin: payload.coachProfile?.sessionMin, custom: customBodyParts(own) };
+  // A new plan may name the programme it was built from only among the ones this payload offered,
+  // and a plan the person brought themselves is told about the counted limits, not refused over them.
+  const basis = { programIds: (payload.programs?.candidates || []).map(c => c.id), ownPlan: !!payload.coachProfile?.ownPlan };
   const checked = kind === 'review'
     ? validateReview(parsed.value, payload.plan, { customIds, ...limits })
     : kind === 'debrief'
@@ -74,7 +77,7 @@ export async function attemptOnce({ adapter, cfg, kind, payload, model, timeoutM
       customIds,
       workingWeights: payload.history?.workingWeights,
       daysPerWeek: payload.coachProfile?.daysPerWeek,
-      ...limits
+      ...limits, ...basis
     });
 
   if (!checked.ok) return { ok: false, repairable: !repair, errors: checked.errors, raw: r.text, errorClass: 'unusable' };

@@ -16,7 +16,8 @@
  */
 import { libraryHas, libraryName } from './library.js';
 import { glyphStr } from './glyphs.js';
-import { planLoadErrors, changeLoadErrors, customBodyParts } from './plan-load.js';
+import { planLoadFindings, findingErrors, advisoriesOf, isHardFinding, changeLoadErrors, customBodyParts } from './plan-load.js';
+import { programCard } from './kb.js';
 
 // The closed list (FR-23 / C3). Adding a member here is a deliberate act with an apply
 // implementation on the client to match; there is no default case anywhere.
@@ -76,7 +77,14 @@ const INVERTED_RANGE = where =>
    the person gave (V6). plan-load.js does the counting; a plan or a set of changes over either
    limit goes back for the repair round with the count, the limit and where the sets come from.
    For a review only what the changes themselves made worse is an error — a plan its owner
-   edited past a limit by hand does not make every later proposal unusable. */
+   edited past a limit by hand does not make every later proposal unusable.
+
+   A new plan the person brought themselves (`ctx.ownPlan`: the intake carries a plan they want to
+   train) is not turned away over either count. It is theirs, and a programme that asks for
+   twenty-four sets of chest was not written by mistake. The counts travel on the bundle instead,
+   as `advisories` the plan card words for them, beside the two counts that are only ever notes:
+   a body part under the weekly minimum (V1) and one over its share of a single session (V3).
+   Everything that is not a count is held exactly as before — ids, the week, the working weights. */
 
 /* =============================== created plans =============================== */
 
@@ -213,10 +221,32 @@ export function validatePlan(data, ctx = {}) {
 
   // V2 and V6: the week this plan schedules, counted. Checked beside whatever else is wrong, so
   // the one repair round hears about all of it.
-  errors.push(...planLoadErrors({ routines, week }, {
-    sessionMin: ctx.sessionMin,
-    custom: new Map([...(ctx.custom || []), ...customBodyParts(customEx)])
-  }));
+  const scheduled = { routines, week };
+  const custom = new Map([...(ctx.custom || []), ...customBodyParts(customEx)]);
+  const findings = planLoadFindings(scheduled, { sessionMin: ctx.sessionMin, custom });
+  if (!ctx.ownPlan) errors.push(...findingErrors(scheduled, findings, custom));
+  const advisories = advisoriesOf(scheduled, ctx.ownPlan ? findings : findings.filter(f => !isHardFinding(f)));
+
+  // The programme the plan says it was built from has to be one this job was handed (kb.js).
+  // Anything else is the model's memory of a programme, and the card would put the catalogue's
+  // name and link under it. A revision is handed its own previous plan, where `program` is the
+  // card object the first answer was given; the id inside one reads the same as an id.
+  const named = data.program && typeof data.program === 'object' && !Array.isArray(data.program) ? data.program.id : data.program;
+  let program = null;
+  if (named != null && named !== '') {
+    const offered = ctx.programIds || [];
+    if (isStr(named) && offered.includes(named)) program = programCard(named);
+    else {
+      errors.push(`program "${clampStr(named, 60)}" is not one of the programmes in this payload (${offered.length ? offered.map(id => `"${id}"`).join(', ') : 'it holds none'}) — `
+        + 'put one of those ids in "program", or leave "program" out and say in "basedOn" what the plan rests on');
+    }
+  }
+  // Where their own plan departs from the principles in ways nothing here can count, in the
+  // model's words. Only for a plan they brought: on one the Coach designed there is nothing to
+  // depart from but its own choices, and `summary` is where those are argued.
+  const differences = ctx.ownPlan
+    ? (Array.isArray(data.differences) ? data.differences : []).filter(isStr).slice(0, 6).map(d => clampStr(d.trim(), 300))
+    : [];
 
   // The block the plan is meant to run in: a number of weeks and a few lines on what they are
   // for. It changes nothing in the plan itself (the phone keeps it as the charter's block when
@@ -234,6 +264,10 @@ export function validatePlan(data, ctx = {}) {
       name: clampStr(data.name || 'Coach plan', 40),
       summary: clampStr(data.summary || '', 1200),
       basedOn: clampStr(data.basedOn || '', 400),
+      ...(program ? { program } : {}),
+      ...(ctx.ownPlan ? { own: true } : {}),
+      ...(advisories.length ? { advisories } : {}),
+      ...(differences.length ? { differences } : {}),
       ...(block ? { block } : {}),
       week, routines, customEx
     }

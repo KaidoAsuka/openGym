@@ -68,7 +68,7 @@ export default function CoachIntake() {
   const [busy, setBusy] = useState(false)
   const [p, setP] = useState(() => ({
     goal: null, experience: null, daysPerWeek: 3, preferredDays: [1, 3, 5],
-    sessionMin: 60, equipment: [], limitations: '', likes: '', dislikes: '', notes: '',
+    sessionMin: 60, equipment: [], limitations: '', likes: '', dislikes: '', notes: '', ownPlan: '',
     ...(S.coach?.profile || {})
   }))
   const set = patch => setP(v => ({ ...v, ...patch }))
@@ -219,6 +219,11 @@ export default function CoachIntake() {
         <div className="ob-field"><TextArea rows={2} maxLength={300} value={p.dislikes} onChange={e => set({ dislikes: e.target.value })} placeholder={t('e.g. “I hate lunges”')} /></div>
         <div className="ob-sub" style={{ marginTop: 4 }}>{t('Anything you want the Coach to know')}</div>
         <div className="ob-field"><TextArea rows={3} maxLength={600} value={p.notes} onChange={e => set({ notes: e.target.value })} placeholder={t('e.g. “I want visible arms progress by spring”')} /></div>
+        {/* Last, so the three boxes above keep their places. With this filled in the Coach lays
+            their plan out instead of designing one (api/coach/prompts/create.md). */}
+        <div className="ob-sub" style={{ marginTop: 4 }}>{t('A plan you want to follow')}</div>
+        <div className="ob-field"><TextArea rows={4} maxLength={1500} value={p.ownPlan} onChange={e => set({ ownPlan: e.target.value })} placeholder={t('e.g. “Push/pull/legs, six days, the way I ran it last year: …”')} /></div>
+        <div className="ob-note">{t('Name a programme or describe your own. The Coach lays it out as you wrote it and notes where it differs from the usual advice.')}</div>
       </>}
     </div>
 

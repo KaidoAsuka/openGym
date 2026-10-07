@@ -108,6 +108,39 @@ test('names, the declined log and the meta codes are bounded too, since the stat
   }
 });
 
+test('the accepted changes and the kept debriefs come out of the same client-written log, and are cut the same', () => {
+  const today = new Date().toISOString().slice(0, 10);
+  const S = sampleState();
+  S.workouts[0].d = today;
+  const decision = {
+    status: 'accepted', type: 'swap-exercise' + HUGE, routineName: 'Day' + HUGE, why: 'because' + HUGE,
+    target: { routineId: 'r' + HUGE, exId: 'e' + HUGE, weekday: HUGE },
+    before: HUGE,
+    after: { id: 'x' + HUGE, name: HUGE, sets: HUGE, reps: 8, note: HUGE, with: 'y' + HUGE, link: HUGE, ex: [...Array(5000)].map(() => HUGE) }
+  };
+  S.coach.log = [
+    { kind: 'create', at: Date.now(), summary: HUGE, bundle: { name: 'Plan' + HUGE, routines: [{ name: HUGE }] } },
+    ...[...Array(200)].map(() => ({ kind: 'review', at: HUGE, decisions: [decision, { ...decision, before: [...Array(5000)].map(() => HUGE), after: { nested: { deeper: HUGE } } }] })),
+    ...[...Array(200)].map((_, i) => ({ kind: 'debrief', at: Date.now(), workout: { id: 'w' + i + HUGE, d: today + HUGE, name: 'A' + HUGE }, summary: HUGE, score: HUGE, watch: [...Array(500)].map(() => HUGE), nextTime: [...Array(500)].map(() => HUGE), highlights: [HUGE] }))
+  ];
+  const p = payload.build(S, { handle: 'h'.repeat(16), kind: 'review' });
+  assert.equal(p.recentChanges.length, payload.RECENT_CHANGES);
+  assert.equal(p.debriefs.length, payload.DEBRIEFS);
+  const size = JSON.stringify({ c: p.recentChanges, d: p.debriefs }).length;
+  assert.ok(size < 60_000, 'the two together stay small (' + size + ')');
+  const c = p.recentChanges[0];
+  assert.ok(c.type.length <= payload.PROFILE_WORD_MAX && c.routine.length <= payload.NAME_MAX && c.why.length <= payload.CHANGE_WHY_CHARS);
+  assert.ok(c.routineId.length <= payload.ID_MAX && c.exId.length <= payload.ID_MAX);
+  assert.equal(c.on, null, 'a stamp that is not a time is no date');
+  assert.equal('weekday' in c, false);
+  assert.deepEqual(Object.keys(c.after).sort(), ['exercises', 'id', 'name', 'reps', 'with'], 'an object is read by name: no free text');
+  assert.equal(c.after.exercises, 5000, 'a list of exercises travels as its length');
+  assert.deepEqual(p.recentChanges[1].after, {}, 'and an unknown shape is emptied, not passed through');
+  const d = p.debriefs[0];
+  assert.ok(d.name.length <= payload.NAME_MAX && d.summary.length <= payload.DEBRIEF_SUMMARY_CHARS && d.score === null);
+  assert.ok(d.watch.length <= payload.DEBRIEF_ITEMS && d.watch.every(x => x.length <= payload.DEBRIEF_ITEM_CHARS));
+});
+
 // The server's limits are the screen's limits. If someone lengthens a field on the intake
 // screen, this says the payload would now cut what the person was allowed to type.
 test('the limits match the intake screen', () => {

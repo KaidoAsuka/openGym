@@ -1,6 +1,6 @@
 # Task: review their training and propose plan changes
 
-Read `window` (what they actually did), `aggregates` (stalls, adherence, coverage), `bodyweight`, and `userNote` if present. Then decide whether the **plan** should change.
+Read `window` (what they actually did), `aggregates` (stalls, adherence, coverage), `bodyweight`, `recentChanges` and `debriefs` (what you already changed, and what you already said), and `userNote` if present. Then decide whether the **plan** should change.
 
 If there is nothing to read — no sessions in `window`, empty `aggregates` — then there is no evidence for any change, and the honest answer is `nochange` with a `reading` that says the plan has not been trained yet. Do not invent a reason to change something.
 
@@ -15,6 +15,15 @@ Change something when the data says so:
 - Body weight moving against their goal for several weeks — that is a **note**, not a plan change. Say it plainly and leave the plan alone.
 
 **One session is not a trend.** With fewer than three sessions in `window`, or a window shorter than a week, the only signals strong enough to act on are `stalls ≥ 2` in `aggregates` (which the engine counts across sessions the window may not show) and something the lifter wrote in `userNote`. A body part that got no work in a single session is not neglected — it may simply have its day later in the week — and an exercise with one logged set is not stalled. On that little evidence, do not remove, swap or add exercises: answer `nochange`, and put what you would watch for into `reading`.
+
+**Read what you already changed.** `recentChanges` is this plan's recent history, each entry with the reason it was made. Check it before you propose anything:
+
+- Do not undo or re-change something in `recentChanges` unless the sessions logged since its `on` date show it did not do what its `why` said it would. Then say so in the new `why`: name the earlier change, its date, and the data since. A change with fewer than three sessions behind it has not been tested yet — leave it alone.
+- An entry with `reverted: true` was tried and taken back. Treat it exactly like an entry in `previouslyDeclined`.
+- When a new change follows from an earlier one — a swap that did not end the stall, a set cut that brought the session back under time — say that in its `why`, so the plan's history reads as one line of reasoning.
+- In `summary`, or in `reading` when nothing changes, say in a sentence how the most recent accepted changes are working out, if the window holds sessions since they were applied.
+
+**Your debriefs are leads, not evidence.** `debriefs[].watch` and `nextTime` are what you flagged after single sessions. The same concern raised in two or more debriefs is worth checking against `window` and `aggregates`, and worth acting on if the logged sets agree. A concern that appears once is one session, and one session is not a trend — unless it describes pain, which rule 6 covers and which needs no second mention.
 
 **Change nothing when nothing warrants it.** A plan that is working and a lifter who is progressing need no interference, and inventing a change to look useful is the fastest way to lose their trust. In that case answer:
 

@@ -246,6 +246,13 @@ A review reads a training block, not a training career: the window is capped at 
 sessions**. Your profile is identified by a stable pseudonym that is never the user id and never
 reversible.
 
+A review also reads the Coach's own record in your state: the last 20 changes you accepted (what
+was changed, on which day, the before and after, and the reason given at the time; one you undid
+is marked as undone), and what it wrote after single sessions in the window (score, summary,
+what to watch, what to do next time; at most six). These are things the Coach said earlier about
+your plan and your training, not a new category of data, and they are cut to fixed lengths like
+everything else in the payload.
+
 Excluded on purpose and permanently: **display name and user id, passkey and credential
 material, push subscriptions, invite data, theme and appearance settings, and every other
 profile's everything.**

@@ -207,6 +207,87 @@ test('declined changes are carried forward so the Coach does not nag', () => {
   assert.equal(p.previouslyDeclined[0].type, 'sets');
 });
 
+/* ---------- what the Coach already changed and already said ---------- */
+const DAY = 86400000;
+const at = d => Date.parse(d + 'T12:00:00Z');
+const loggedState = () => {
+  const S = sampleState();
+  S.coach.log = [
+    { kind: 'create', at: at('2026-06-01'), proposalId: 'p0', summary: 'Three full-body days around the dumbbells you have.', bundle: { name: 'Dumbbell base' } },
+    { kind: 'review', at: at('2026-06-20'), proposalId: 'p1', summary: 's', decisions: [
+      { id: 'c1', type: 'sets', target: { routineId: 'r1', exId: '0001' }, before: 4, after: 3, why: 'Sessions ran 20 minutes over; one set less on the first lift.', routineName: 'Old name', status: 'accepted' },
+      { id: 'c2', type: 'reps', target: { routineId: 'r1', exId: '0001' }, before: 10, after: 8, why: 'declined one', status: 'rejected' },
+      { id: 'c3', type: 'swap-exercise', target: { routineId: 'gone', exId: '0007' }, before: null, after: { id: '0001', sets: 3, reps: 10, why: 'x'.repeat(5000) }, why: 'w'.repeat(5000), routineName: 'Removed day', status: 'accepted' }
+    ] },
+    { kind: 'review', at: at('2026-07-05'), proposalId: 'p2', summary: 's', decisions: [
+      { id: 'c1', type: 'week', target: { weekday: 3 }, before: ['r1'], after: 'rest', why: 'Wednesday was skipped four weeks running.', status: 'accepted' }
+    ] },
+    { kind: 'revert', at: at('2026-07-06'), proposalId: 'p2' },
+    { kind: 'review', at: at('2026-07-08'), proposalId: 'p3', dismissed: true, decisions: [{ id: 'c1', type: 'sets', status: 'rejected', why: 'whole proposal turned down' }] }
+  ];
+  return S;
+};
+
+test('accepted changes travel on a review with their reason, their day and their before/after', () => {
+  const p = payload.build(loggedState(), { handle: handleFor('u1'), kind: 'review' });
+  assert.deepEqual(p.recentChanges.map(c => c.type), ['new-plan', 'sets', 'swap-exercise', 'week']);
+  const [plan, sets, swap, week] = p.recentChanges;
+  assert.deepEqual(plan, { on: '2026-06-01', type: 'new-plan', name: 'Dumbbell base', why: 'Three full-body days around the dumbbells you have.' });
+  assert.deepEqual(sets, {
+    on: '2026-06-20', type: 'sets', routineId: 'r1', routine: 'Full body A', exId: '0001', exercise: payload.libraryName('0001'),
+    before: 4, after: 3, why: 'Sessions ran 20 minutes over; one set less on the first lift.'
+  });
+  // A routine that is gone keeps the name the log wrote down; an object is reduced to what names it.
+  assert.equal(swap.routine, 'Removed day');
+  assert.deepEqual(swap.after, { id: '0001', name: payload.libraryName('0001'), sets: 3, reps: 10 });
+  assert.equal(swap.why.length, payload.CHANGE_WHY_CHARS);
+  assert.deepEqual({ weekday: week.weekday, before: week.before, after: week.after }, { weekday: 3, before: ['r1'], after: 'rest' });
+  // Declined ones still travel where they always did, and only there.
+  assert.ok(p.previouslyDeclined.some(d => d.why === 'declined one'));
+  assert.ok(!JSON.stringify(p.recentChanges).includes('declined one'));
+});
+
+test('a change that was undone says so, and a proposal turned down whole is not a change', () => {
+  const p = payload.build(loggedState(), { handle: handleFor('u1'), kind: 'review' });
+  assert.deepEqual(p.recentChanges.map(c => !!c.reverted), [false, false, false, true]);
+  assert.ok(!JSON.stringify(p.recentChanges).includes('whole proposal turned down'));
+});
+
+test('only the most recent changes travel, and none on a first plan or a debrief', () => {
+  const S = sampleState();
+  S.coach.log = [...Array(30)].map((_, i) => ({ kind: 'review', at: at('2026-06-01') + i * DAY, proposalId: 'p' + i, decisions: [{ type: 'sets', target: { routineId: 'r1', exId: '0001' }, before: 3, after: 4, why: 'n' + i, status: 'accepted' }] }));
+  const p = payload.build(S, { handle: handleFor('u1'), kind: 'review' });
+  assert.equal(p.recentChanges.length, payload.RECENT_CHANGES);
+  assert.equal(p.recentChanges.at(-1).why, 'n29');
+  for (const kind of ['create', 'debrief']) assert.equal('recentChanges' in payload.build(S, { handle: handleFor('u1'), kind }), false);
+  assert.equal('recentChanges' in payload.build(sampleState(), { handle: handleFor('u1'), kind: 'review' }), false);
+});
+
+test('debriefs written about sessions in the window travel on a review, one per workout', () => {
+  // Dated from today, not from the fixture: the window is the last twelve weeks of the clock.
+  const ago = n => new Date(Date.now() - n * DAY).toISOString().slice(0, 10);
+  const S = sampleState();
+  S.workouts = [{ ...S.workouts[0], id: 'old', d: ago(200) }, { ...S.workouts[0], id: 'w1', d: ago(3) }];
+  const debrief = (id, d, over = {}) => ({ kind: 'debrief', at: at(d) + DAY, workout: { id, d, name: 'Full body A' }, summary: 'Solid.', score: 7, highlights: ['h'], watch: ['Bench stalled at 20 kg'], nextTime: ['Hold 20 kg'], ...over });
+  S.coach.log = [
+    debrief('old', ago(200)),
+    debrief('w1', ago(3), { summary: 'first reading' }),
+    debrief('w1', ago(3), { summary: 's'.repeat(5000), score: 99, watch: [...Array(9)].map((_, i) => 'w' + i + 'x'.repeat(5000)), nextTime: ['  keep  ', '', 7, null] })
+  ];
+  const p = payload.build(S, { handle: handleFor('u1'), kind: 'review' });
+  assert.equal(p.debriefs.length, 1, 'the session debriefed twice counts once, and the one before the window is left out');
+  const d = p.debriefs[0];
+  assert.equal(d.d, ago(3));
+  assert.equal(d.name, 'Full body A');
+  assert.equal(d.summary.length, payload.DEBRIEF_SUMMARY_CHARS, 'the later reading of the same session is the one kept');
+  assert.equal(d.score, null, 'a score outside 1-10 is not a score');
+  assert.equal(d.watch.length, payload.DEBRIEF_ITEMS);
+  assert.ok(d.watch.every(x => x.length <= payload.DEBRIEF_ITEM_CHARS));
+  assert.deepEqual(d.nextTime, ['keep']);
+  assert.equal('highlights' in d, false);
+  for (const kind of ['create', 'debrief']) assert.equal('debriefs' in payload.build(S, { handle: handleFor('u1'), kind }), false);
+});
+
 /* ---------- debriefs and the cohort ---------- */
 const debriefState = () => sampleState({
   workouts: [

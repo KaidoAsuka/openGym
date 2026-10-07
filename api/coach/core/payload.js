@@ -455,6 +455,118 @@ export function workoutMeta(S, workoutId) {
   };
 }
 
+/* ---------- what the Coach already changed, and what it already said ----------
+   The log (frontend/src/lib/coach.js appendLog) keeps every decision with its reason, and until
+   now only the refusals travelled. A review that cannot see what it changed last month, or why,
+   proposes the opposite this month with the same confidence — so the accepted half travels too,
+   and with it what was written after single sessions, which was kept for display and never
+   read again.
+
+   Both come back out of the synced state, which the client writes, so they are read like
+   everything else here: by name, by type, and cut. */
+export const RECENT_CHANGES = 20;
+export const CHANGE_WHY_CHARS = 240;
+export const DEBRIEFS = 6;
+export const DEBRIEF_ITEMS = 4;
+export const DEBRIEF_ITEM_CHARS = 200;
+export const DEBRIEF_SUMMARY_CHARS = 300;
+// A reorder lists a routine's exercises, and the validator lets a routine hold twenty.
+const CHANGE_LIST_MAX = 20;
+
+// The log stamps an entry with Date.now(); the model reads days.
+const stamp = at => {
+  const d = new Date(typeof at === 'number' ? at : typeof at === 'string' ? Date.parse(at) : NaN);
+  return Number.isFinite(d.getTime()) ? iso(d) : null;
+};
+
+/** A change's `before` or `after`, reduced to what names it: a number, a short word, a list of
+ *  ids, or the few fields of an exercise. Never the object as it came. */
+function briefValue(v, nameOf) {
+  if (v == null) return null;
+  if (typeof v === 'boolean') return v;
+  if (num(v) !== undefined) return v;
+  if (typeof v === 'string') return v.slice(0, NAME_MAX);
+  if (Array.isArray(v)) return v.slice(0, CHANGE_LIST_MAX).map(ident);
+  if (typeof v !== 'object') return null;
+  const o = {};
+  if (v.id != null) { o.id = ident(v.id); o.name = nameOf(v.id); }
+  else if (typeof v.name === 'string') o.name = v.name.slice(0, NAME_MAX);
+  for (const k of ['sets', 'reps', 'sec', 'min', 'speed', 'weight']) if (num(v[k]) !== undefined) o[k] = v[k];
+  if (typeof v.link === 'boolean') o.link = v.link;
+  if (v.with != null) o.with = ident(v.with);
+  if (Array.isArray(v.ex)) o.exercises = v.ex.length;
+  return o;
+}
+
+/** The changes this person accepted, oldest first, each with the reason it was made. */
+function recentChanges(S, coach) {
+  const log = list(coach.log).filter(e => e && typeof e === 'object');
+  // Undoing a change-set logs a `revert` naming the proposal it took back (coach.js revertLast).
+  const undone = new Set(log.filter(e => e.kind === 'revert' && e.proposalId != null).map(e => e.proposalId));
+  const routines = new Map(list(S.routines).filter(r => r && typeof r === 'object').map(r => [r.id, r.name]));
+  const custom = new Map(list(S.customEx).filter(c => c && typeof c === 'object').map(c => [c.id, c.n]));
+  const nameOf = id => libraryName(id) || word(custom.get(id), NAME_MAX);
+  const out = [];
+  for (const e of log) {
+    if (e.dismissed) continue;
+    const reverted = e.proposalId != null && undone.has(e.proposalId) ? { reverted: true } : {};
+    if (e.kind === 'create') {
+      out.push({ on: stamp(e.at), type: 'new-plan', name: word(e.bundle?.name, NAME_MAX), why: text(e.summary, CHANGE_WHY_CHARS), ...reverted });
+      continue;
+    }
+    if (e.kind !== 'review') continue;
+    for (const d of list(e.decisions)) {
+      if (!d || typeof d !== 'object' || d.status !== 'accepted') continue;
+      const target = d.target && typeof d.target === 'object' ? d.target : {};
+      const c = { on: stamp(e.at), type: word(d.type, PROFILE_WORD_MAX) };
+      if (target.routineId != null) {
+        c.routineId = ident(target.routineId);
+        // The name the routine has now; a routine that has since been removed keeps the one the
+        // log wrote down.
+        c.routine = word(routines.get(target.routineId) ?? d.routineName, NAME_MAX);
+      }
+      if (target.exId != null) { c.exId = ident(target.exId); c.exercise = nameOf(target.exId); }
+      if (Number.isInteger(target.weekday) && target.weekday >= 0 && target.weekday <= 6) c.weekday = target.weekday;
+      c.before = briefValue(d.before, nameOf);
+      c.after = briefValue(d.after, nameOf);
+      c.why = text(d.why, CHANGE_WHY_CHARS);
+      out.push({ ...c, ...reverted });
+    }
+  }
+  return out.slice(-RECENT_CHANGES);
+}
+
+const lines = v => list(v).filter(x => typeof x === 'string' && x.trim()).slice(0, DEBRIEF_ITEMS).map(x => x.trim().slice(0, DEBRIEF_ITEM_CHARS));
+
+/** What was written after single sessions from `from` on, oldest first. One per workout: a
+ *  session debriefed twice would otherwise read as the same concern raised twice. */
+function pastDebriefs(coach, from) {
+  if (!from) return [];
+  const seen = new Set();
+  const out = [];
+  const log = list(coach.log);
+  for (let i = log.length - 1; i >= 0 && out.length < DEBRIEFS; i--) {
+    const e = log[i];
+    if (!e || typeof e !== 'object' || e.kind !== 'debrief') continue;
+    const w = e.workout && typeof e.workout === 'object' ? e.workout : {};
+    // A debrief kept before the card named its session has only the day it was written.
+    const d = day(w.d) || stamp(e.at);
+    if (!d || d < from) continue;
+    const key = w.id != null ? 'w' + ident(w.id) : 'd' + d;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      d,
+      name: word(w.name, NAME_MAX),
+      score: Number.isInteger(e.score) && e.score >= 1 && e.score <= 10 ? e.score : null,
+      summary: text(e.summary, DEBRIEF_SUMMARY_CHARS),
+      watch: lines(e.watch),
+      nextTime: lines(e.nextTime)
+    });
+  }
+  return out.reverse();
+}
+
 /**
  * Build a job payload.
  *
@@ -532,6 +644,11 @@ export function build(S, opts = {}) {
     };
     p.aggregates = aggregates(S, workouts);
     p.bodyweight = { goal: num(S.targetW) ?? null, series: weighIns(S, p.window.from, null) };
+    // Why the plan is the way it is, and what was said about the sessions in the window.
+    const changed = recentChanges(S, coach);
+    if (changed.length) p.recentChanges = changed;
+    const read = pastDebriefs(coach, p.window.from);
+    if (read.length) p.debriefs = read;
     if (opts.note) p.userNote = String(opts.note).slice(0, MAX_NOTE_CHARS);
     if (opts.cohort) p.cohort = cleanCohort(opts.cohort);
     // A review names mostly what is already trained; 60 candidates is plenty for a swap.

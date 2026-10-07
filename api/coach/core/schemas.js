@@ -1,4 +1,4 @@
-/* JSON schemas for the three answer shapes, handed to providers that can enforce a schema
+/* JSON schemas for the four answer shapes, handed to providers that can enforce a schema
  * while decoding (Ollama/llama.cpp grammar sampling, LM Studio, vLLM, OpenAI json_schema).
  *
  * Deliberately flat: no $ref, no anyOf/oneOf, no additionalProperties tricks — llama.cpp's
@@ -114,4 +114,19 @@ export const DEBRIEF_SCHEMA = {
   required: ['coach_contract', 'summary', 'score']
 };
 
-export const SCHEMAS = { review: REVIEW_SCHEMA, create: CREATE_SCHEMA, refine: CREATE_SCHEMA, debrief: DEBRIEF_SCHEMA };
+// The item counts are the validator's (DIGEST_ITEMS_MAX), stated here for the reason the create
+// schema states its own: a small model that starts listing does not stop at a request.
+const FEW = { type: 'array', maxItems: 4, items: { type: 'string' } };
+export const DIGEST_SCHEMA = {
+  type: 'object',
+  properties: {
+    coach_contract: { type: 'integer' },
+    summary: STR,
+    progress: FEW,
+    issues: FEW,
+    carry: FEW
+  },
+  required: ['coach_contract', 'summary']
+};
+
+export const SCHEMAS = { review: REVIEW_SCHEMA, create: CREATE_SCHEMA, refine: CREATE_SCHEMA, debrief: DEBRIEF_SCHEMA, digest: DIGEST_SCHEMA };

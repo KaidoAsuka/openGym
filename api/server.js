@@ -2402,9 +2402,11 @@ const routes = {
     db.subs = (db.subs || []).filter(x => x.userId !== u.id);
     dropDeviceLinks(db, u.id);
     presence.delete(u.id);
-    // The training history and any Coach credential of theirs, both outside db.json.
+    // The training history and any Coach credential of theirs, both outside db.json — and what
+    // the Coach holds about them: a proposal not yet answered, the notes it wrote on their weeks.
     try { fs.unlinkSync(stateFile(u.id)); } catch { /* already gone */ }
     try { coachConfig.clearProfileAuth(u.id); } catch { /* nothing stored */ }
+    try { coachJobs.removeUser(u.id); } catch { /* nothing held */ }
     // Their photos and videos — the one place a profile's folder under uploads/ is removed.
     try { MEDIA.removeUser(u.id); } catch (e) { console.error('media: could not remove uploads of', u.id, e.message); }
     saveDb();

@@ -1,4 +1,4 @@
-/* Scheduled reviews (Epic E).
+/* Scheduled reviews (Epic E), and the weekly note that is written before them.
  *
  * A separate tick from the workout reminder's, because the two want different things: the
  * reminder has to land on the minute someone chose, this only has to happen on the right
@@ -11,6 +11,7 @@
  */
 import * as jobs from './jobs.js';
 import * as cfgStore from './config.js';
+import { dueWeek } from './digest.js';
 
 const TICK_MS = 60000;
 
@@ -99,6 +100,34 @@ const hhmmToMin = v => {
 };
 
 /**
+ * The weekly note (digest.js): queue the oldest finished, trained week that has none.
+ *
+ * It runs for everyone who consented, whatever their review cadence is set to — a review asked
+ * for by hand reads the notes as well. The date is the person's own where the profile carries a
+ * timezone (the reminder's); where it does not, it is UTC's and the week is left a day longer.
+ *
+ * @returns true when a note was queued, so the caller leaves this profile for the tick
+ */
+export function queueDigest(uid, S, deps) {
+  // What the phone has taken into its state is no longer held for it.
+  jobs.releaseDigests(uid, S);
+  const tz = S.reminder?.tz || null;
+  const today = (tz && deps.userNow(tz)?.date) || null;
+  const week = dueWeek(S, jobs.readUser(uid), today || new Date().toISOString().slice(0, 10), { tzKnown: !!today });
+  if (!week) return false;
+  try {
+    jobs.enqueue(uid, { kind: 'digest', trigger: 'scheduled', week });
+    console.log('coach: weekly note queued for', uid, week.from);
+    return true;
+  } catch (e) {
+    // The day's cap, a shared account, a provider switched off: ordinary, silent, and no reason
+    // to hold up the review that may be due on the same tick.
+    if (!(e instanceof jobs.CoachError)) throw e;
+    return false;
+  }
+}
+
+/**
  * @param {object} deps  { users(): [{id}], userNow(tz): {date,hhmm,weekday} }
  */
 export function startCadence(deps) {
@@ -113,7 +142,11 @@ export function startCadence(deps) {
         // a second review would only replace the first unread. status() also retires an
         // expired proposal, which a phone that stays closed never polls for.
         const st = jobs.status(user.id);
-        if (st.job || st.pending) continue;
+        if (st.job) continue;
+        // The week's note comes before the review and does not wait for a proposal to be
+        // answered: it is not one, and a review queued on a later tick then reads it.
+        if (queueDigest(user.id, S, deps)) continue;
+        if (st.pending) continue;
         // Reviewed means the model read those workouts and answered — with a proposal, with
         // "nothing to change", or with an answer that failed validation and was paid for all the
         // same. A call that never reached it (timeout, no runtime, consent, switched off) is retried.

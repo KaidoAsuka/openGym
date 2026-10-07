@@ -634,3 +634,46 @@ export function validateDebrief(data) {
   if (errors.length) return fail(errors);
   return { ok: true, proposal: { summary: clampStr(data.summary.trim(), 600), score, ...lists } };
 }
+
+/* =============================== the week, written up =============================== */
+
+// The same limits payload.js reads a kept note back at (DIGEST_*); api/test/digest.test.js pins
+// them together. A note is read again by every review for months, so it is held to its size here.
+export const DIGEST_LISTS = ['progress', 'issues', 'carry'];
+export const DIGEST_SUMMARY_MAX = 500;
+export const DIGEST_ITEMS_MAX = 4;
+export const DIGEST_ITEM_MAX = 160;
+
+/** Text held to a length without stopping mid-sentence where it can be helped: back to the last
+ *  full stop when that keeps at least half of what was allowed, and at the limit otherwise. A
+ *  note cut off at "the squat sto" would be read back that way for twelve weeks. */
+function cutText(v, n) {
+  const s = String(v).trim();
+  if (s.length <= n) return s;
+  const head = s.slice(0, n);
+  const end = Math.max(...['. ', '! ', '? ', '。', '！', '？'].map(m => head.lastIndexOf(m)));
+  return end >= n / 2 ? head.slice(0, end + 1).trim() : head;
+}
+
+/**
+ * Validate a weekly note — a few sentences and three short lists about one week, with nothing
+ * to apply and nothing to decide. Like a debrief it cannot carry a change, and one that tries is
+ * refused rather than trimmed. The week's counts are not asked of the model at all: the caller
+ * attaches them from the log (payload.js weekFacts).
+ * Returns { ok, proposal:{ summary, progress, issues, carry } } | { ok:false, errors }.
+ */
+export function validateDigest(data) {
+  if (!data || typeof data !== 'object') return fail(['the answer was not an object']);
+  const errors = [];
+  if (data.nochange) errors.push('a note on the week was requested — "nochange" is not an answer here; write down what happened');
+  if (Array.isArray(data.changes) && data.changes.length) errors.push('a note on the week carries no plan changes — drop "changes" and put what a review should look at into "carry"');
+  if (!isStr(data.summary)) errors.push('summary is required — three or four sentences on how the week went, with its numbers');
+  const lists = {};
+  DIGEST_LISTS.forEach(k => {
+    const v = data[k];
+    if (v != null && !Array.isArray(v)) { errors.push(`${k} must be an array of short strings`); lists[k] = []; return; }
+    lists[k] = (v || []).filter(isStr).slice(0, DIGEST_ITEMS_MAX).map(x => cutText(x, DIGEST_ITEM_MAX));
+  });
+  if (errors.length) return fail(errors);
+  return { ok: true, proposal: { summary: cutText(data.summary, DIGEST_SUMMARY_MAX), ...lists } };
+}

@@ -31,6 +31,7 @@ import {
 import { insightsFor, sessionInsights } from '../lib/coach-insights.js'
 import { charterLine, addDays } from '../lib/coach-charter.js'
 import CharterSheet from './CoachCharter.jsx'
+import DigestsSheet from './CoachDigests.jsx'
 import { useCoachStatus, requestReview, requestDebrief, requestPlan, refinePlan, resolvePending, cohortStats, setCohortShare, jobErrorText, awaitedJob, settleAwaited, JOB_ERRORS } from '../lib/coach-api.js'
 import { confirmSheet } from '../sheets.jsx'
 import Icon from '../components/Icon.jsx'
@@ -77,6 +78,8 @@ export default function CoachChat() {
     const was = prevJob.current
     prevJob.current = job
     if (job) return
+    // A weekly note is nobody's question: when the job writing one ends, the thread says nothing.
+    if (was?.kind === 'digest') return
     const mine = awaitedJob()
     const endedUnseen = !was && !!mine && last?.id === mine
     if (!was && !endedUnseen) return
@@ -166,6 +169,7 @@ export default function CoachChat() {
       {idle && <Row icon="clipboard" iconTint="var(--indigo)" title={t('Start a new plan')} subtitle={t('A fresh plan from your answers; your workouts stay')} accessory="chevron" onClick={() => { close(); askNewPlan() }} />}
       <Row icon="pencil" iconTint="var(--indigo)" title={t('Edit my answers')} subtitle={t('Goal, days, equipment, limits')} accessory="chevron" onClick={() => closeThenNav(close, '/coach/intake?edit=1')} />
       <Row icon="target" iconTint="var(--red)" title={t('Goal & checkpoint')} subtitle={charterLine(coach.charter)} accessory="chevron" onClick={() => { close(); openSheet(done => <CharterSheet close={done} />) }} />
+      <Row icon="calendar" iconTint="var(--teal)" title={t('Weekly notes')} subtitle={t('What the Coach wrote down about each week')} accessory="chevron" onClick={() => { close(); openSheet(() => <DigestsSheet />) }} />
       <Row icon="clock" iconTint="var(--purple)" title={t('Automatic reviews')} subtitle={cadenceLabel(coach)} accessory="chevron" onClick={() => { close(); cadenceSheet(openSheet, update) }} />
       {canRevert(S) && <Row icon="reset" iconTint="var(--blue)" title={t('Undo the last Coach changes')} accessory="chevron" onClick={() => { close(); doRevert() }} />}
     </div>
@@ -286,7 +290,7 @@ function Typing({ S, kind, coachLocal, config }) {
     // local model rather than something wrong; the next line already warns it takes longer.
     eta = local ? '' : t('This usually takes a minute or two.')
   }
-  const doing = kind === 'create' ? t('Building your plan…') : kind === 'debrief' ? t('Looking at that session…') : t('Reading your training…')
+  const doing = kind === 'create' ? t('Building your plan…') : kind === 'debrief' ? t('Looking at that session…') : kind === 'digest' ? t('Writing up last week…') : t('Reading your training…')
   return <div className="msg coach">
     <div className="bub typing"><i /><i /><i /></div>
     <div className="typing-eta">

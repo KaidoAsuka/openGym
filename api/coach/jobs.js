@@ -27,6 +27,7 @@ import { handleFor } from './handle.js';
 import { fetchFor } from './node-fetch.js';
 import { canDropPrivileges, unprivilegedIds } from './adapters/spawn.js';
 import { cohortForPayload, invalidate as invalidateCohort } from './cohort.js';
+import { keep as keepDigest, unfetched as unfetchedDigests } from './digest.js';
 
 // The prompt assembly, the plan fingerprint and the invoke→parse→validate→repair loop all
 // live in ./core now, where the phone can import them too. Re-exported so nothing that
@@ -47,7 +48,9 @@ const HISTORY_MAX = 20;
 
 const safe = uid => String(uid).replace(/[^a-zA-Z0-9_-]/g, '');
 const userFile = uid => path.join(COACH_DIR, safe(uid) + '.json');
-const EMPTY = { daily: null, current: null, pending: null, history: [] };
+// `digests` are the weekly notes written while nobody was looking, held until the phone has taken
+// them into its own state (digest.js).
+const EMPTY = { daily: null, current: null, pending: null, history: [], digests: [] };
 
 export function readUser(uid) {
   try { return { ...EMPTY, ...JSON.parse(fs.readFileSync(userFile(uid), 'utf8')) }; }
@@ -80,6 +83,22 @@ export function clearUser(uid) {
   aborts.get(uid)?.abort();
   forgetSeq.set(uid, (forgetSeq.get(uid) || 0) + 1);
   invalidateCohort();
+}
+
+/** The profile itself is gone — an admin removed it. Everything clearUser drops, and the day's
+ *  count with it: there is nobody left for the cap to hold back, and the file would otherwise
+ *  outlive the account it was about. */
+export function removeUser(uid) {
+  clearUser(uid);
+  try { fs.unlinkSync(userFile(uid)); } catch { /* nothing left */ }
+}
+
+/** The synced state now holds these weeks' notes, so the copies kept for the phone have done
+ *  their work. Called from the scheduler's tick, which has the state open anyway. */
+export function releaseDigests(uid, S) {
+  const held = readUser(uid).digests || [];
+  const left = unfetchedDigests(held, S);
+  if (left.length !== held.length) patchUser(uid, { digests: left });
 }
 
 /** Every profile with a state file — the population a cohort is drawn from. */
@@ -150,11 +169,16 @@ export function status(uid) {
     cap: capState(uid),
     // How the most recent job ended, so the chat can say "nothing to change" or "that failed"
     // in the Coach's own bubble rather than leaving a job that silently stopped appearing.
-    last: lastOutcome(rec)
+    last: lastOutcome(rec),
+    // Weekly notes the phone has not taken yet. The whole note, every poll, until the synced
+    // state shows it arrived: taking one in is idempotent on the phone, and there are few.
+    ...(rec.digests?.length ? { digests: rec.digests } : {})
   };
 }
 function lastOutcome(rec) {
-  const h = (rec.history || []).at(-1);
+  // A weekly note is nobody's question, so how one ended is nobody's answer: the chat reads
+  // `last` as the reply to what was asked, and a note written in between must not stand in for it.
+  const h = (rec.history || []).filter(e => e.kind !== 'digest').at(-1);
   return h ? { id: h.id, kind: h.kind, outcome: h.outcome, errorClass: h.errorClass || null, at: h.at, ...(h.reading ? { reading: h.reading } : {}) } : null;
 }
 function archive(uid, rec, outcome) {
@@ -239,9 +263,11 @@ export function enqueue(uid, opts) {
     id: crypto.randomBytes(8).toString('hex'),
     uid,
     forgetSeq: forgetSeq.get(uid) || 0,
-    kind: opts.kind,                                  // 'create' | 'review' | 'debrief'
+    kind: opts.kind,                                  // 'create' | 'review' | 'debrief' | 'digest'
     trigger: opts.trigger || 'manual',                // 'manual' | 'scheduled'
     workoutId: opts.workoutId ? String(opts.workoutId).slice(0, 40) : null,
+    // The week a digest writes up, as the scheduler worked it out (digest.js dueWeek).
+    week: opts.kind === 'digest' && opts.week ? { from: String(opts.week.from).slice(0, 10), to: String(opts.week.to).slice(0, 10) } : null,
     intake: opts.intake || null,
     note: clampMessage(opts.note),
     refine: clampMessage(opts.refine),
@@ -279,6 +305,8 @@ function finish(job, result) {
   const history = [...(rec.history || []), {
     id: job.id, kind: job.kind, trigger: job.trigger, outcome: result.outcome,
     errorClass: result.errorClass || null, at: Date.now(),
+    // Which week a note was for, so the scheduler can tell a week that failed from one not tried.
+    ...(job.week ? { week: job.week.from } : {}),
     // "Nothing to change" is an answer with a reason attached, and throwing the reason away
     // leaves the user with a job that finished and nothing to show for it. It lives here, in
     // the profile's own file — deliberately not in `detail`, which goes to the instance log
@@ -289,6 +317,7 @@ function finish(job, result) {
     ...rec,
     current: null,
     pending: result.pending !== undefined ? result.pending : rec.pending,
+    ...(result.digest ? { digests: keepDigest(rec.digests, result.digest) } : {}),
     history
   });
   if (result.outcome === 'ready' && onProposal) {
@@ -320,6 +349,10 @@ async function execute(job) {
   if (job.kind === 'debrief' && !payloadLib.findWorkout(S, job.workoutId)) {
     return finish(job, { outcome: 'failed', errorClass: 'noworkout' });
   }
+  // The week's sessions can have been deleted between the tick that queued this and now.
+  if (job.kind === 'digest' && !(job.week && payloadLib.weekWorkouts(S, job.week.from, job.week.to).length)) {
+    return finish(job, { outcome: 'failed', errorClass: 'noworkout' });
+  }
 
   const pendingCreate = job.refine ? readUser(job.uid).pending : null;
   const payload = payloadLib.build(S, {
@@ -330,6 +363,10 @@ async function execute(job) {
     refine: job.refine,
     previous: pendingCreate?.bundle || null,
     workoutId: job.workoutId,
+    week: job.week,
+    // Notes the phone has not fetched are still notes: a scheduled review runs with nobody's
+    // app open, and reads them from here.
+    digests: (job.kind === 'review' || job.kind === 'digest') ? readUser(job.uid).digests : null,
     // The app says which language it is in. A scheduled review has no app behind it: a profile
     // that never picked a language then gets the instance's DEFAULT_LANG, like its screens do.
     lang: job.lang || (S.langAuto === true ? payloadLib.langTag(process.env.DEFAULT_LANG) : null),
@@ -367,6 +404,16 @@ async function execute(job) {
     }
     if (attempt.nochange) {
       return finish(job, { outcome: 'nochange', pending: null, detail: null, reading: attempt.reading });
+    }
+    if (job.kind === 'digest') {
+      // Not a proposal: nothing to answer, nothing to expire, and whatever is waiting in
+      // `pending` stays there. The counts are taken from the log, not from the model.
+      const digest = {
+        id: job.id, from: job.week.from, to: job.week.to, at: Date.now(),
+        ...payloadLib.weekFacts(S, job.week.from, job.week.to),
+        ...attempt.result
+      };
+      return finish(job, { outcome: 'kept', digest });
     }
     const pending = {
       id: job.id,

@@ -3645,11 +3645,13 @@ components:
             - type: object
               properties:
                 id: { type: string }
-                kind: { type: string, enum: [create, review, debrief] }
+                kind: { type: string, enum: [create, review, debrief, digest] }
                 state: { type: string, enum: [queued, running] }
                 startedAt: { type: integer, description: Epoch ms. }
             - type: 'null'
-          description: The job running now, or null. One at a time per profile.
+          description: >-
+            The job running now, or null. One at a time per profile. A `digest` is the weekly
+            note the scheduler queues on its own; no route asks for one.
         pending:
           oneOf:
             - $ref: '#/components/schemas/CoachProposal'
@@ -3676,6 +3678,38 @@ components:
                 at: { type: integer, description: Epoch ms. }
                 reading: { type: string, description: "Present on `nochange` — why there was nothing to change." }
             - type: 'null'
+        digests:
+          type: array
+          description: |
+            Weekly notes written since the profile's synced state last held them. Absent when
+            there are none. The same notes are sent on every poll until a state that carries
+            them in `coach.digests` has been synced; taking one in twice changes nothing.
+          items: { $ref: '#/components/schemas/CoachDigest' }
+
+    CoachDigest:
+      type: object
+      description: |
+        One trained week, written up by the Coach after it ended. The counts are taken from
+        the log by the server; the summary and the three lists are the model's, checked and
+        cut to length. It is not a proposal: nothing to accept, nothing that expires.
+      properties:
+        id: { type: string }
+        from: { type: string, format: date, description: The week's first day. }
+        to: { type: string, format: date, description: The week's last day. }
+        at: { type: integer, description: Epoch ms the note was written. }
+        sessions: { type: integer }
+        planned: { type: integer, description: Days the plan schedules in a week. }
+        sets: { type: integer, description: Work sets done. }
+        minutes: { type: integer }
+        prs: { type: integer }
+        marks:
+          type: object
+          description: Sessions each kind of mark appears in. Absent when nothing was marked.
+          additionalProperties: { type: integer }
+        summary: { type: string, maxLength: 500 }
+        progress: { type: array, maxItems: 4, items: { type: string, maxLength: 160 } }
+        issues: { type: array, maxItems: 4, items: { type: string, maxLength: 160 } }
+        carry: { type: array, maxItems: 4, items: { type: string, maxLength: 160 }, description: What a later review should check. }
 
     CoachProposal:
       type: object

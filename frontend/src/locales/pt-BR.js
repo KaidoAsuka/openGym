@@ -1237,6 +1237,13 @@ export const PT_BR_OVERRIDES = {
   'Too light': 'Leve demais',
   'Don’t like it': 'Não gosto',
   'Marked, not done': 'Marcado, não feito',
+  'Weekly notes': 'Notas semanais',
+  'What the Coach wrote down about each week': 'O que o Coach anotou sobre cada semana',
+  'Nothing yet. After each week you train, the Coach writes a short note on it here and reads the notes back at every review.': 'Nada ainda. Depois de cada semana de treino, o Coach escreve aqui uma nota curta e relê as notas a cada revisão.',
+  '{0} of {1} sessions': '{0} de {1} sessões',
+  'What moved forward': 'O que avançou',
+  'What got in the way': 'O que atrapalhou',
+  'Writing up last week…': 'Escrevendo a nota da semana passada…',
 }
 
 export default { ...pt, ...PT_BR_OVERRIDES }

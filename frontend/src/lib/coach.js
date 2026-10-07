@@ -28,7 +28,8 @@ export const CONSENT_VERSION = 2
 
 // Bounds. The whole state has to stay inside the server's 5 MB body limit, and a Coach log
 // that grows forever is exactly the kind of thing that eats it invisibly. Worst case here is
-// ~75 KB; the namespace guard is the backstop for the case nobody predicted.
+// ~75 KB, and the weekly notes (lib/coach-digests.js, 26 of at most ~3 KB) add as much again;
+// the namespace guard is the backstop for the case nobody predicted.
 export const SNAPSHOT_MAX = 3
 export const LOG_MAX = 50
 export const CHAT_MAX = 40
@@ -42,7 +43,9 @@ export const emptyCoach = () => ({
   // server-side (or in the phone's device file) until it is applied or dismissed.
   chat: [],
   // How long the last few jobs took, so the typing bubble can say "usually about 2 minutes".
-  timings: []
+  timings: [],
+  // The weeks the Coach wrote up, oldest first (lib/coach-digests.js).
+  digests: []
 })
 const coachOf = s => (s.coach = s.coach || emptyCoach())
 
@@ -326,6 +329,8 @@ function trim(s) {
   let guard = 0
   while (JSON.stringify(c).length > NAMESPACE_MAX && guard++ < 60) {
     if ((c.chat || []).length > 8) c.chat.shift()
+    // The oldest weekly notes go before a snapshot does: a review reads twelve of them.
+    else if ((c.digests || []).length > 12) c.digests.shift()
     else if ((c.snapshots || []).length > 1) c.snapshots.shift()
     else if ((c.log || []).length > 1) c.log.shift()
     else break

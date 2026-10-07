@@ -12,8 +12,9 @@ import { MOBILE } from './mobile.js'
 import { t, getLang } from './i18n.js'
 import { useStore } from '../store/useStore.js'
 import { useUI } from '../store/useUI.js'
+import { freshDigests, adoptDigests } from './coach-digests.js'
 
-const POLL_MS = 3000        // a job is running: often enough to feel live
+const POLL_MS = 3000       // a job is running: often enough to feel live
 const IDLE_MS = 60000       // a Coach screen is open but nothing is running
 
 // The demo build has no backend, so it answers these locally with a canned proposal built
@@ -59,7 +60,17 @@ const track = r => {
 export const awaitedJob = () => awaited
 export const settleAwaited = id => { if (!id || awaited === id) awaited = null }
 
-export const coachStatus = async () => DEMO ? (await demo()).demoStatus() : LOCAL() ? (await local()).localStatus() : api('/api/coach/status')
+export const coachStatus = async () => DEMO ? (await demo()).demoStatus(S()) : LOCAL() ? (await local()).localStatus() : api('/api/coach/status')
+
+// Weekly notes the server wrote while nobody was looking ride on the status poll until this
+// profile's synced state holds them (lib/coach-digests.js). Taking one in is an ordinary local
+// edit, pushed like any other, and the server stops handing it over once it sees it arrive — so
+// the same notes come back for a poll or two, and only a new one opens an update.
+function takeDigests(list) {
+  const store = useStore.getState()
+  if (!store.ready || !Array.isArray(list) || !freshDigests(store.S, list).length) return
+  store.update(s => { adoptDigests(s, list) })
+}
 const _requestReview = async note => DEMO ? (await demo()).demoReview(S()) : LOCAL() ? (await local()).localReview(S(), note) : api('/api/coach/review', { method: 'POST', body: JSON.stringify({ note: note || '', lang: getLang() }) })
 export const requestReview = (...a) => _requestReview(...a).then(track)
 const _requestPlan = async intake => DEMO ? (await demo()).demoPlan(S(), intake) : LOCAL() ? (await local()).localPlan(S(), intake) : api('/api/coach/plan', { method: 'POST', body: JSON.stringify({ intake, lang: getLang() }) })
@@ -107,6 +118,7 @@ export function useCoachStatus(active = true) {
     const mine = ++seq.current
     try {
       const s = await coachStatus()
+      takeDigests(s?.digests)
       // An answer that arrives after a newer request was sent is older than what that request
       // will bring: the idle poll in flight when a run is started must not land after the
       // refresh that follows the start, putting back the run count and last outcome from before.

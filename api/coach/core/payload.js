@@ -578,9 +578,10 @@ function recentChanges(S, coach) {
 
 const lines = v => list(v).filter(x => typeof x === 'string' && x.trim()).slice(0, DEBRIEF_ITEMS).map(x => x.trim().slice(0, DEBRIEF_ITEM_CHARS));
 
-/** What was written after single sessions from `from` on, oldest first. One per workout: a
- *  session debriefed twice would otherwise read as the same concern raised twice. */
-function pastDebriefs(coach, from) {
+/** What was written after single sessions from `from` on (and, for one week, up to `to`),
+ *  oldest first. One per workout: a session debriefed twice would otherwise read as the same
+ *  concern raised twice. */
+function pastDebriefs(coach, from, to) {
   if (!from) return [];
   const seen = new Set();
   const out = [];
@@ -591,7 +592,7 @@ function pastDebriefs(coach, from) {
     const w = e.workout && typeof e.workout === 'object' ? e.workout : {};
     // A debrief kept before the card named its session has only the day it was written.
     const d = day(w.d) || stamp(e.at);
-    if (!d || d < from) continue;
+    if (!d || d < from || (to && d > to)) continue;
     const key = w.id != null ? 'w' + ident(w.id) : 'd' + d;
     if (seen.has(key)) continue;
     seen.add(key);
@@ -746,11 +747,118 @@ function cleanCharter(S, coach, today) {
   return Object.keys(o).length ? o : null;
 }
 
+/* ---------- the week, written up ----------
+   A review reads the sessions since the last one, and the rest of what happened reaches it as
+   counts. What a count cannot hold — that the bench was taken three Mondays running, that a
+   shoulder was first mentioned in August — went nowhere. So each trained week is written up once
+   by its own small job (prompts/digest.md), and the notes travel on later reviews in place of
+   the one-line sessions of the weeks they cover.
+
+   A note is kept in the synced state (`S.coach.digests`, frontend/src/lib/coach-digests.js) and,
+   until a phone has fetched it, in the server's own record (api/coach/digest.js). Both are read
+   here by name, by type, and cut: the first is the client's, and the sentences in either were
+   written by a model.
+
+   The limits are the ones the validator holds an answer to and the phone keeps a note at;
+   api/test/digest.test.js and frontend/src/lib/coach-digests.test.js pin the three together. */
+export const DIGESTS_SENT = 12;
+export const DIGEST_SUMMARY_CHARS = 500;
+export const DIGEST_ITEMS = 4;
+export const DIGEST_ITEM_CHARS = 160;
+export const DIGEST_LISTS = ['progress', 'issues', 'carry'];
+// Two sessions a day, every day. A week that claims more is not a week of training.
+export const WEEK_SESSIONS_MAX = 14;
+// How many kept notes are looked at before the newest are chosen; the phone keeps 26.
+const DIGESTS_READ = 60;
+
+/** The week a day falls in, as its first and last day. `weekStart` is the app's own setting, a
+ *  getDay() index that is Sunday or else Monday (frontend/src/lib/format.js weekStartOf). */
+export function weekBounds(on, weekStart) {
+  const at = Date.parse(day(on) + 'T12:00:00Z');
+  if (!Number.isFinite(at)) return null;
+  const back = (new Date(at).getUTCDay() - (weekStart === 0 ? 0 : 1) + 7) % 7;
+  const first = at - back * 86400000;
+  return { from: iso(new Date(first)), to: iso(new Date(first + 6 * 86400000)) };
+}
+
+/** The sessions logged from one day to another, both included. */
+export function weekWorkouts(S, from, to) {
+  const a = day(from), b = day(to);
+  if (!a || !b) return [];
+  return list(S.workouts)
+    .filter(w => w && typeof w === 'object' && day(w.d) && day(w.d) >= a && day(w.d) <= b)
+    .slice(-WEEK_SESSIONS_MAX);
+}
+
+/** A week in numbers, counted here so the note about it never has to: sessions against the days
+ *  the plan schedules, work sets done, minutes trained, records, and the sessions each kind of
+ *  mark appears in. */
+export function weekFacts(S, from, to) {
+  const workouts = weekWorkouts(S, from, to);
+  let sets = 0, minutes = 0, prs = 0;
+  const marks = {};
+  for (const w of workouts) {
+    const m = w.end && w.start ? Math.round((w.end - w.start) / 60000) : 0;
+    if (Number.isFinite(m) && m > 0) minutes += m;
+    prs += list(w.prs).length;
+    const kinds = new Set();
+    entriesOf(w).forEach(en => {
+      sets += setsOf(en).filter(s => s.done && !isWarmupSet(s)).length;
+      flagsOf(en.flags).forEach(k => kinds.add(k));
+    });
+    skippedOf(w).forEach(en => flagsOf(en.flags).forEach(k => kinds.add(k)));
+    kinds.forEach(k => { marks[k] = (marks[k] || 0) + 1; });
+  }
+  return {
+    sessions: workouts.length,
+    planned: [0, 1, 2, 3, 4, 5, 6].filter(d => S.week?.[d]?.length).length,
+    sets, minutes, prs,
+    ...(Object.keys(marks).length ? { marks: Object.fromEntries(FLAG_KINDS.filter(k => marks[k]).map(k => [k, marks[k]])) } : {})
+  };
+}
+
+const tally = v => (Number.isInteger(v) && v >= 0 && v <= 100000 ? v : undefined);
+const shortLines = v => list(v).filter(x => typeof x === 'string' && x.trim()).slice(0, DIGEST_ITEMS).map(x => x.trim().slice(0, DIGEST_ITEM_CHARS));
+
+/** One kept note, or null for anything that is not one. */
+function cleanDigest(g) {
+  if (!g || typeof g !== 'object') return null;
+  const from = day(g.from), to = day(g.to);
+  const summary = text(g.summary, DIGEST_SUMMARY_CHARS).trim();
+  if (!from || !to || to < from || !summary) return null;
+  const o = { from, to };
+  for (const k of ['sessions', 'planned', 'sets', 'minutes', 'prs']) if (tally(g[k]) !== undefined) o[k] = g[k];
+  const marks = g.marks && typeof g.marks === 'object' ? FLAG_KINDS.filter(k => tally(g.marks[k])).map(k => [k, g.marks[k]]) : [];
+  if (marks.length) o.marks = Object.fromEntries(marks);
+  o.summary = summary;
+  for (const k of DIGEST_LISTS) {
+    const items = shortLines(g[k]);
+    if (items.length) o[k] = items;
+  }
+  return o;
+}
+
+/**
+ * The weeks written up so far, oldest first, one note per week.
+ *
+ * @param {object} coach   `S.coach`
+ * @param {Array} [held]   notes the server still holds for a phone that has not fetched them; a
+ *                         scheduled review runs with nobody's app open, so it cannot wait for one
+ */
+export function digestsOf(coach, held) {
+  const byWeek = new Map();
+  for (const g of [...list(coach?.digests).slice(-DIGESTS_READ), ...list(held).slice(-DIGESTS_READ)]) {
+    const c = cleanDigest(g);
+    if (c) byWeek.set(c.from, c);
+  }
+  return [...byWeek.values()].sort((a, b) => a.from.localeCompare(b.from));
+}
+
 /**
  * Build a job payload.
  *
  * @param {object} S      the profile's synced state
- * @param {object} opts   { handle, kind, intake?, note?, refine?, previous?, workoutId?, cohort?, lang? }
+ * @param {object} opts   { handle, kind, intake?, note?, refine?, previous?, workoutId?, cohort?, lang?, week?, digests? }
  *
  * `handle` is the opaque per-profile pseudonym the payload carries instead of a uid. It is
  * supplied rather than derived because the two runtimes mint it differently: the server keys
@@ -763,7 +871,7 @@ export function build(S, opts = {}) {
   const profile = opts.intake || coach.profile || null;
   const p = {
     coach_contract: CONTRACT,
-    task: opts.kind === 'review' ? 'review' : opts.kind === 'debrief' ? 'debrief' : 'create',
+    task: opts.kind === 'review' ? 'review' : opts.kind === 'debrief' ? 'debrief' : opts.kind === 'digest' ? 'digest' : 'create',
     meta: {
       profile: opts.handle,
       // Both are short codes in any real state; cut anyway, since the state is the client's.
@@ -777,7 +885,10 @@ export function build(S, opts = {}) {
     coachProfile: profile && typeof profile === 'object' ? cleanProfile(profile) : null,
     plan: cleanPlan(S)
   };
-  const charter = cleanCharter(S, coach, p.meta.today);
+  // A week is written up as it stood when it ended, which for a week caught up on later is not
+  // today: the block's week number and its checkpoint are placed on that day.
+  const week = opts.kind === 'digest' && opts.week && typeof opts.week === 'object' ? { from: day(opts.week.from), to: day(opts.week.to) } : null;
+  const charter = cleanCharter(S, coach, week?.to || p.meta.today);
   if (charter) p.charter = charter;
 
   // What the user already turned down, so the Coach does not re-propose it without new
@@ -787,9 +898,34 @@ export function build(S, opts = {}) {
     // client writes; it is cut at the length the intake allows a note.
     .flatMap(e => (e.decisions || []).filter(d => d.status === 'rejected').map(d => ({ type: word(d.type, PROFILE_WORD_MAX), why: text(d.why, PROFILE_TEXT_MAX.notes) })))
     .slice(-15);
-  if (declined.length) p.previouslyDeclined = declined;
+  // A note on a week proposes nothing, so there is nothing for it to propose again.
+  if (declined.length && opts.kind !== 'digest') p.previouslyDeclined = declined;
 
-  if (opts.kind === 'debrief') {
+  if (opts.kind === 'digest') {
+    // One week, read whole: every session in full, the stall and mark picture as it stood on
+    // the week's last day, what was changed and said during it, and the notes on the weeks
+    // before, so a third week of the same thing can be called a third week. No library — a
+    // note names nothing new.
+    const workouts = week?.from && week?.to ? weekWorkouts(S, week.from, week.to) : [];
+    const then = { ...S, workouts: list(S.workouts).filter(w => w && day(w.d) && week?.to && day(w.d) <= week.to) };
+    p.week = { from: week?.from || null, to: week?.to || null, ...weekFacts(S, week?.from, week?.to), workouts: workouts.map(cleanWorkout) };
+    const inWeek = new Set(workouts.flatMap(w => [...entriesOf(w), ...skippedOf(w)].map(en => ident(en.id))));
+    const agg = aggregates(then, workouts);
+    p.aggregates = { ...agg, exercises: agg.exercises.filter(e => inWeek.has(e.id)) };
+    const seen = observations(then, inWeek);
+    if (seen) p.observations = seen;
+    if (week?.to) {
+      const since = new Date(week.to + 'T12:00:00');
+      since.setDate(since.getDate() - 28);
+      p.bodyweight = { goal: num(S.targetW) ?? null, series: Number.isFinite(since.getTime()) ? weighIns(S, iso(since), week.to) : [] };
+      const changed = recentChanges(S, coach).filter(c => c.on && c.on >= week.from && c.on <= week.to);
+      if (changed.length) p.recentChanges = changed;
+      const read = pastDebriefs(coach, week.from, week.to);
+      if (read.length) p.debriefs = read;
+      const before = digestsOf(coach, opts.digests).filter(g => g.to < week.from).slice(-3);
+      if (before.length) p.digests = before;
+    }
+  } else if (opts.kind === 'debrief') {
     // One session, read closely: the workout itself, the last few times the same routine was
     // trained, and the stall picture for the exercises in it. No library — a debrief changes
     // nothing and names nothing new.
@@ -821,11 +957,22 @@ export function build(S, opts = {}) {
   } else if (opts.kind === 'review') {
     const workouts = reviewWindow(S, coach.lastReview?.at ? String(coach.lastReview.at).slice(0, 10) : null);
     const detailFrom = Math.max(0, workouts.length - FULL_DETAIL_SESSIONS);
+    // The weeks already written up. They reach back past the window — the window starts at the
+    // last review, the notes do not — and inside it they stand in for the one-line sessions of
+    // the weeks they cover. The last few sessions keep their sets whatever week they fall in,
+    // and a week nobody wrote up keeps its lines.
+    const written = digestsOf(coach, opts.digests).slice(-DIGESTS_SENT);
+    const inNote = w => written.some(g => day(w.d) >= g.from && day(w.d) <= g.to);
+    const lines = workouts.slice(0, detailFrom).filter(w => !inNote(w));
     p.window = {
       from: day(workouts[0]?.d),
       to: day(workouts[workouts.length - 1]?.d),
-      workouts: workouts.map((w, i) => (i >= detailFrom ? cleanWorkout(w) : compactWorkout(w)))
+      workouts: [...lines.map(compactWorkout), ...workouts.slice(detailFrom).map(cleanWorkout)]
     };
+    // Sessions of the window that are in a note instead of in the list, so the count the model
+    // reports as its evidence still adds up.
+    if (detailFrom > lines.length) p.window.inDigests = detailFrom - lines.length;
+    if (written.length) p.digests = written;
     p.aggregates = aggregates(S, workouts);
     p.bodyweight = { goal: num(S.targetW) ?? null, series: weighIns(S, p.window.from, null) };
     // Why the plan is the way it is, and what was said about the sessions in the window.
@@ -867,7 +1014,7 @@ export function build(S, opts = {}) {
       p.userNote = String(opts.refine).slice(0, MAX_NOTE_CHARS);
     }
   }
-  if (opts.kind !== 'debrief') {
+  if (opts.kind !== 'debrief' && opts.kind !== 'digest') {
     const said = conversation(coach, [opts.note, opts.refine]);
     if (said.length) p.conversation = said;
   }

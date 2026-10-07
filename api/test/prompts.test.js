@@ -30,6 +30,10 @@ test('buildPrompt picks the task by kind and refine, and only adds the repair bl
   const debrief = buildPrompt('debrief', payload, null);
   assert.ok(debrief.includes(PROMPTS.debrief) && !debrief.includes(PROMPTS.review) && !debrief.includes(PROMPTS.create));
 
+  const digest = buildPrompt('digest', payload, null);
+  assert.ok(digest.startsWith(PROMPTS.common));
+  assert.ok(digest.includes(PROMPTS.digest) && !digest.includes(PROMPTS.review) && !digest.includes(PROMPTS.debrief));
+
   const create = buildPrompt('create', payload, null);
   assert.ok(create.includes(PROMPTS.create) && !create.includes(PROMPTS.refine));
   const refine = buildPrompt('create', { ...payload, refine: { text: 'x' } }, null);

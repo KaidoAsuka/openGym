@@ -166,9 +166,46 @@ export function demoCohort(S) {
   return { ok: true, enabled: true, sharing: true, people: 5, minPeople: 3, unit: S.unit, sessionsPerWeek: { median: 3, you }, exercises, rankPct: 62 }
 }
 
+/* The weekly notes a server would have written by now: one for each of the last two finished
+   weeks the demo profile trained in, with the week's real counts. The sentences are what a model
+   would have written, and a model writes in the reader's language — these are canned, so they
+   are English whatever the app is set to, and deliberately not run through t(). */
+const DAY = 864e5
+export function demoDigests(S) {
+  const day = at => iso(new Date(at))
+  const monday = new Date()
+  monday.setHours(12, 0, 0, 0)
+  monday.setDate(monday.getDate() - (monday.getDay() + 6) % 7)
+  const out = []
+  for (const back of [2, 1]) {
+    const from = day(monday.getTime() - back * 7 * DAY), to = day(monday.getTime() - back * 7 * DAY + 6 * DAY)
+    const sessions = (S?.workouts || []).filter(w => w && w.d >= from && w.d <= to)
+    if (!sessions.length) continue
+    const sets = sessions.reduce((n, w) => n + (w.entries || []).reduce((m, en) => m + (en.sets || []).filter(s => s.done && !isWarmupRow(s)).length, 0), 0)
+    const minutes = sessions.reduce((n, w) => n + (w.end && w.start ? Math.round((w.end - w.start) / 60000) : 0), 0)
+    const prs = sessions.reduce((n, w) => n + (w.prs || []).length, 0)
+    const planned = [0, 1, 2, 3, 4, 5, 6].filter(d => S.week?.[d]?.length).length
+    const first = EXIDX[sessions[0].entries?.[0]?.id]?.n || 'the first lift'
+    out.push({
+      id: 'demo-' + from, from, to, at: Date.parse(to + 'T20:00:00Z'), sessions: sessions.length, planned, sets, minutes, prs,
+      summary: `${sessions.length} of ${planned} planned sessions, ${sets} work sets in ${minutes} minutes. Loads held or moved up on every main lift, and nothing was cut short.`,
+      progress: [prs ? `${prs} personal record${prs === 1 ? '' : 's'} this week.` : `Every set of ${first} hit its target.`],
+      issues: sessions.length < planned ? [`${planned - sessions.length} planned day${planned - sessions.length === 1 ? '' : 's'} not trained.`] : [],
+      carry: [`Check whether ${first} keeps moving next week.`]
+    })
+  }
+  return out
+}
+
 /* ---------------- the API surface the demo stands in for ---------------- */
 
-export const demoStatus = () => ({ job, pending, cap: { used: 0, limit: 0 }, lastError })
+// `digests` only when there are some, as the server answers (api/coach/jobs.js status).
+export const demoStatus = S => {
+  // A profile the notes cannot be built from still has a status: the poll is what ends a job.
+  let digests = []
+  try { digests = demoDigests(S) } catch { /* no notes, then */ }
+  return { job, pending, cap: { used: 0, limit: 0 }, lastError, ...(digests.length ? { digests } : {}) }
+}
 
 function start(kind, make) {
   if (job) throw Object.assign(new Error(t('The Coach is already thinking about your training.')), { status: 409 })

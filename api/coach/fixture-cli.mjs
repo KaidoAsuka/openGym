@@ -119,6 +119,18 @@ if (kind === 'debrief') {
   });
 }
 
+// digest: one week written up, with the counts it was handed echoed so a test can check they arrived
+if (kind === 'digest') {
+  const w = P.week || {};
+  out({
+    coach_contract: 1,
+    summary: `Week of ${w.from || '?'}: ${w.sessions ?? 0} of ${w.planned ?? '?'} planned sessions, ${w.sets ?? 0} work sets in ${w.minutes ?? 0} minutes.`,
+    progress: (w.workouts || []).length ? [`${(w.workouts[0].entries || []).length} exercises trained in the first session.`] : [],
+    issues: Object.keys(w.marks || {}).map(k => `Marked ${k} in ${w.marks[k]} session(s).`),
+    carry: [(P.digests || []).length ? `Follows ${P.digests.length} earlier note(s).` : 'First week written up — nothing earlier to compare against.']
+  });
+}
+
 // review
 const routine = (P.plan?.routines || [])[0];
 const first = routine?.ex?.[0];

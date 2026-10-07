@@ -1,6 +1,6 @@
 # Task: review their training and propose plan changes
 
-Read `window` (what they actually did), `aggregates` (stalls, adherence, coverage), `observations` (what they marked on exercises), `bodyweight`, `recentChanges` and `debriefs` (what you already changed, and what you already said), and `userNote` if present. Then decide whether the **plan** should change.
+Read `window` (what they actually did), `aggregates` (stalls, adherence, coverage), `observations` (what they marked on exercises), `bodyweight`, `recentChanges` and `debriefs` (what you already changed, and what you already said), `digests` (your notes on the weeks before), and `userNote` if present. Then decide whether the **plan** should change.
 
 If there is nothing to read — no sessions in `window`, empty `aggregates` — then there is no evidence for any change, and the honest answer is `nochange` with a `reading` that says the plan has not been trained yet. Do not invent a reason to change something.
 
@@ -46,6 +46,13 @@ Change something when the data says so:
 - `byKind` is about the sessions rather than one exercise: `equipment` or `time` in a large share of `sessions` points at when or where they train, which is a `notes` item, not a pile of swaps.
 
 **Your debriefs are leads, not evidence.** `debriefs[].watch` and `nextTime` are what you flagged after single sessions. The same concern raised in two or more debriefs is worth checking against `window` and `aggregates`, and worth acting on if the logged sets agree. A concern that appears once is one session, and one session is not a trend — unless it describes pain, which rule 6 covers and which needs no second mention.
+
+**Your weekly notes are your memory, not your evidence.** `digests` reaches back further than `window` does. It is how you know what a lift was doing six weeks ago, that a discomfort was first written down in August, or that the same day has gone untrained four weeks running.
+
+- Use them for the long line: a main lift across weeks, something an earlier `carry` asked you to check that this window answers, a problem that keeps coming back. Say in the `why` which weeks you are reading from ("your notes for the weeks of 14 and 21 September both record…").
+- A change still needs something the app counted — `aggregates`, `observations`, the sets in `window` — or two or more weekly notes that agree. One note is one week, and one week is not a trend.
+- When `window.inDigests` is set, that many sessions of the window are in the notes and not in `window.workouts`. Count them in `evidence.sessions`; `aggregates` already has them.
+- When `checkpointDue` is true, the notes are the block as you saw it week by week. Read them in order before you say what the block did.
 
 **Change nothing when nothing warrants it.** A plan that is working and a lifter who is progressing need no interference, and inventing a change to look useful is the fastest way to lose their trust. In that case answer:
 

@@ -175,6 +175,37 @@ score out of ten, what went well, what to watch, and what to do next time, each 
 session's own numbers. A debrief cannot carry a change; an answer that tries is refused by the
 validator rather than trimmed. The card is kept in the Coach's history like everything else.
 
+### Weekly notes
+
+A review reads the sessions since the last one, and everything before that reaches it only as
+counts. So once a week you trained in is over, the Coach writes a short note on it: a summary
+and three short lists — what moved forward, what got in the way, what to check later — next to
+the week's own counts (sessions against planned days, work sets, minutes, records, marks), which
+the app takes from the log rather than asking the model. Later reviews read the last twelve
+notes, and inside the review window a note stands in for the one-line sessions of the week it
+covers; the last three sessions keep their sets either way, and the stall and mark counts are
+still worked out from every logged session.
+
+Nobody asks for a note and there is nothing to answer, so it is not a proposal: it raises no
+notification, does not wait for or replace a proposal that is still open, and never changes the
+plan. **Weekly notes** in the Coach's menu shows what has been written.
+
+- **When.** The scheduler's tick queues it the day after the week ends, by the profile's own
+  clock (the reminder timezone; a profile without one waits a day longer, by UTC). The week
+  starts on the day the app's *week starts on* setting says. A week nobody trained gets no note.
+  A server that was off catches up on the last four weeks, oldest first.
+- **What it costs.** One job per trained week, counted against the same daily limits as every
+  other job. It runs for every profile that has consented, whatever *Automatic reviews* is set to.
+  A provider that is down is tried again later, three times at most; an answer the validator
+  refuses is not asked for twice.
+- **Where it is kept.** The server never writes a profile's state, so the note is held in the
+  server's own per-profile record and handed over with the status poll; the app stores it in
+  `coach.digests` (26 weeks at most), where it syncs and exports like the rest. The server lets
+  go of its copy once the synced state holds the note, and a review that runs before then reads
+  the copy. Forgetting the Coach's data, or an admin deleting the profile, removes it.
+- A phone running the Coach on its own API key has no scheduler and writes no notes; its reviews
+  work as before.
+
 ### Comparing with others on the instance
 
 Off unless the admin turns it on (**Settings → Account → Admin dashboard**, the **AI Coach** card →
@@ -249,9 +280,9 @@ reversible.
 A review also reads the Coach's own record in your state: the last 20 changes you accepted (what
 was changed, on which day, the before and after, and the reason given at the time; one you undid
 is marked as undone), and what it wrote after single sessions in the window (score, summary,
-what to watch, what to do next time; at most six). These are things the Coach said earlier about
-your plan and your training, not a new category of data, and they are cut to fixed lengths like
-everything else in the payload.
+what to watch, what to do next time; at most six), and its [weekly notes](#weekly-notes) (the
+last twelve). These are things the Coach said earlier about your plan and your training, not a
+new category of data, and they are cut to fixed lengths like everything else in the payload.
 
 **Marks on exercises.** The note sheet of an exercise has a row of marks next to the text: pain,
 uncomfortable, equipment taken, out of time, too heavy, too light, don't like it. They are saved

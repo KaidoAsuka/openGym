@@ -40,12 +40,13 @@ test('buildPrompt is exactly the two parts joined, so the CLI adapters lose noth
 });
 
 test('every task has a flat schema — no $ref, no anyOf/oneOf (llama.cpp grammar limits)', () => {
-  for (const task of ['review', 'create', 'refine', 'debrief']) {
+  for (const task of ['review', 'create', 'refine', 'debrief', 'digest']) {
     const text = JSON.stringify(SCHEMAS[task]);
     assert.ok(text.length > 50, task);
     assert.ok(!/\$ref|anyOf|oneOf|allOf/.test(text), task);
   }
   assert.equal(taskOf('review', {}), 'review');
+  assert.equal(taskOf('digest', {}), 'digest');
   assert.equal(taskOf('create', { refine: 'x' }), 'refine');
 });
 

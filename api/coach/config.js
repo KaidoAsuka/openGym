@@ -70,6 +70,9 @@ export const PROVIDERS = {
   ...HTTP_PROVIDERS
 };
 
+// How many questions a profile may ask during sessions in a day, unless the admin says otherwise.
+export const LIVE_DAILY_DEFAULT = 30;
+
 const DEFAULTS = {
   enabled: false,
   provider: 'fixture',
@@ -78,9 +81,14 @@ const DEFAULTS = {
   // a key away — the one that was pasted for Anthropic is still there when you come back.
   auth: {},                                          // instance mode: { [provider]: { type, account, data:<encrypted>, connectedAt } }
   models: {},                                        // { [provider]: model id }
+  // A question asked during a session is answered while someone stands waiting, and may be
+  // given a quicker model than the jobs that take their minutes. Unset: the provider's model.
+  liveModels: {},                                    // { [provider]: model id }
   providerOptions: {},                               // { [provider]: { baseUrl } }
   boundUid: {},                                      // instance mode: { [provider]: the profile its credential bound to }
-  caps: { perProfileDaily: 10, instanceDaily: 0 },   // 0 = unlimited
+  // `livePerProfileDaily` counts those questions on their own: a session's worth of them must
+  // not use up the day's reviews, nor the other way round.
+  caps: { perProfileDaily: 10, instanceDaily: 0, livePerProfileDaily: LIVE_DAILY_DEFAULT },   // 0 = unlimited
   daily: null,                                       // { date, count }: jobs enqueued today across every profile
   // Anonymous medians across profiles that opt in ("compare with others"). Off by default: it
   // is the one feature where one person's numbers feed into what another person sees.
@@ -95,7 +103,7 @@ const DEFAULTS = {
 };
 export const MAX_MESSAGE_LEN_FLOOR = 200;
 export const MAX_MESSAGE_LEN_CEILING = 4000;
-const PER_PROVIDER = ['auth', 'models', 'providerOptions', 'boundUid'];
+const PER_PROVIDER = ['auth', 'models', 'liveModels', 'providerOptions', 'boundUid'];
 const isPlainObj = v => !!v && typeof v === 'object' && !Array.isArray(v);
 const LOG_MAX = 100;
 
@@ -175,6 +183,8 @@ export function reset() { cache = null; keyCache = null; }
    The only way the rest of the code reads the per-provider maps, so the shape stays here. */
 export const authFor = (cfg = load(), p = cfg.provider) => (cfg.auth && cfg.auth[p]) || null;
 export const modelFor = (cfg = load(), p = cfg.provider) => (cfg.models && cfg.models[p]) || (PROVIDERS[p] && PROVIDERS[p].defaultModel) || null;
+/** The model a question during a session is answered with: its own when one was chosen. */
+export const liveModelFor = (cfg = load(), p = cfg.provider) => (cfg.liveModels && cfg.liveModels[p]) || modelFor(cfg, p);
 export const optionsFor = (cfg = load(), p = cfg.provider) => (cfg.providerOptions && cfg.providerOptions[p]) || {};
 export const boundUidFor = (cfg = load(), p = cfg.provider) => (cfg.boundUid && cfg.boundUid[p]) || null;
 export function saveAuth(provider, auth) {

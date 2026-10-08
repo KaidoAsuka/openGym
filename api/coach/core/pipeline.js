@@ -14,7 +14,7 @@ import { CONTRACT } from './payload.js';
 import { buildPrompt, buildPromptParts } from './prompt.js';
 import { SCHEMAS } from './schemas.js';
 import { extractJSON, contractOK } from './parse.js';
-import { validatePlan, validateReview, validateDebrief, validateDigest, validateAdjust } from './validate.js';
+import { validatePlan, validateReview, validateDebrief, validateDigest, validateAdjust, validateLive } from './validate.js';
 import { customBodyParts } from './plan-load.js';
 
 /**
@@ -23,7 +23,7 @@ import { customBodyParts } from './plan-load.js';
  * @returns {{ ok:true, nochange?:boolean, reading?:string, result?:object }
  *        | { ok:false, errorClass:string, detail?:string, repairable?:boolean, errors?:string[], raw?:string }}
  */
-export async function attemptOnce({ adapter, cfg, kind, payload, model, timeoutMs, invokeOpts = {}, cycle = null }, repair) {
+export async function attemptOnce({ adapter, cfg, kind, payload, model, timeoutMs, invokeOpts = {}, cycle = null, live = null }, repair) {
   // HTTP providers get the rules/payload split (prefix caching, schema-constrained decoding);
   // the runtime-backed CLIs still get one flat prompt — they have no message roles to split over.
   const parts = buildPromptParts(kind, payload, repair);
@@ -77,6 +77,9 @@ export async function attemptOnce({ adapter, cfg, kind, payload, model, timeoutM
           // The cycle as it stood when the payload was built, which the caller hands over: the
           // payload carries it for the model's reading, not in the shape a check needs.
           ? validateAdjust(parsed.value, { cycle, ...limits, ownPlan: basis.ownPlan })
+          : kind === 'live'
+            // The session as the phone sent it, which the caller hands over for the same reason.
+            ? validateLive(parsed.value, { live, customIds, names: Object.fromEntries(own.map(e => [e.id, e.n])) })
           : validatePlan(parsed.value, {
       customIds,
       workingWeights: payload.history?.workingWeights,

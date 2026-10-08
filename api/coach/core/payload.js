@@ -15,6 +15,7 @@ import { LIBRARY, LIB_BY_ID, libraryHas, libraryName, librarySlice, isStretch, M
 import { planLoadForPayload, customBodyParts } from './plan-load.js';
 import { programsForPayload, programBrief } from './kb.js';
 import { cleanCyclePlan, numbersAt, cycleWeekOn, CYCLE_WEEKS_MAX, CYCLE_FOCUS_MAX } from './cycle.js';
+import { liveCounts, LIVE_ENTRIES_MAX, LIVE_ROWS_MAX, LIVE_THREAD_LINES, LIVE_THREAD_CHARS } from './live.js';
 
 export const CONTRACT = 1;
 // Bounds from FR-22. A review reads a training block, not a training career: more history
@@ -1022,11 +1023,81 @@ export function cycleContext(S, today) {
   };
 }
 
+/* ---------- the session under way ----------
+   A question asked between two sets comes with the session it is asked in, as the phone holds
+   it: the server never has one in progress (PUT /api/data drops `active` on the way in). It is
+   client-written like everything else here, and more directly — it arrives in the request that
+   asks — so it is read the same way: by name, by type, and cut. What is read is the app's own
+   `S.active`, so a phone can send that object as it is.
+
+   Each exercise keeps the place it has on the phone (`entry`), because that is where an op is
+   applied (core/live.js); one that cannot be read is left out and the others keep their numbers.
+   A session being filed for a past day (`backfill`) is not under way, and nothing is read of it. */
+export const LIVE_PREVIOUS = 2;
+const LIVE_MINUTES_MAX = 12 * 60;
+
+/** The session as an answer about it is checked against (pipeline.js), or null when what was
+ *  sent is not a session under way. */
+export function liveContext(S, raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw) || raw.backfill) return null;
+  const custom = new Map(list(S?.customEx).filter(c => c && typeof c === 'object').map(c => [c.id, c]));
+  const nameOf = exNamer(S || {});
+  const entries = [];
+  list(raw.entries).slice(0, LIVE_ENTRIES_MAX).forEach((en, entry) => {
+    if (!en || typeof en !== 'object' || ident(en.id) == null) return;
+    const cfg = en.target && typeof en.target === 'object' ? en.target : {};
+    const ex = LIB_BY_ID.get(en.id) || custom.get(en.id);
+    const target = {};
+    for (const [k, v] of Object.entries(targetOf(en) || {})) if (v !== undefined) target[k] = v;
+    entries.push({
+      entry, id: ident(en.id), name: nameOf(en.id), mode: modeOf(cfg, ex),
+      ...(isBw(cfg, ex) ? { bodyweight: true } : {}),
+      ...(isPerSide(cfg) ? { side: true } : {}),
+      target,
+      sets: setsOf(en).slice(0, LIVE_ROWS_MAX).map(cleanSet),
+      ...marked(en, true)
+    });
+  });
+  if (!entries.length) return null;
+  return {
+    id: ident(raw.id), d: day(raw.d), name: word(raw.name, NAME_MAX),
+    startedAt: typeof raw.start === 'number' && Number.isFinite(raw.start) ? raw.start : null,
+    cur: Number.isInteger(raw.cur) && entries.some(e => e.entry === raw.cur) ? raw.cur : null,
+    entries
+  };
+}
+
+/** The session as the model reads it: where they are, and each exercise with its sets counted. */
+function liveForPayload(live, focus) {
+  const minutes = live.startedAt ? Math.round((Date.now() - live.startedAt) / 60000) : null;
+  const at = Number.isInteger(focus) && live.entries.some(e => e.entry === focus) ? focus : live.cur;
+  return {
+    ...(live.name ? { name: live.name } : {}),
+    ...(minutes != null && minutes >= 0 && minutes <= LIVE_MINUTES_MAX ? { minutes } : {}),
+    ...(at != null ? { at } : {}),
+    entries: live.entries.map(e => {
+      const n = liveCounts(e);
+      const { sets, flags, note, ...head } = e;
+      return { ...head, setsDone: n.done, setsLeft: n.left, sets, ...(flags ? { flags } : {}), ...(note ? { note } : {}) };
+    })
+  };
+}
+
+/** What was said in this session so far, oldest first: their lines and the Coach's, cut. The
+ *  phone keeps the thread with the session; nothing of it is held here. */
+function liveThread(v) {
+  return list(v)
+    .filter(m => m && typeof m === 'object' && typeof m.text === 'string' && m.text.trim())
+    .map(m => ({ who: (m.who || m.role) === 'coach' ? 'coach' : (m.who || m.role) === 'user' ? 'user' : null, text: m.text.trim().slice(0, LIVE_THREAD_CHARS) }))
+    .filter(m => m.who)
+    .slice(-LIVE_THREAD_LINES);
+}
+
 /**
  * Build a job payload.
  *
  * @param {object} S      the profile's synced state
- * @param {object} opts   { handle, kind, intake?, note?, refine?, previous?, workoutId?, cohort?, lang?, week?, digests? }
+ * @param {object} opts   { handle, kind, intake?, note?, refine?, previous?, workoutId?, cohort?, lang?, week?, digests?, live?, focus?, thread? }
  *
  * `handle` is the opaque per-profile pseudonym the payload carries instead of a uid. It is
  * supplied rather than derived because the two runtimes mint it differently: the server keys
@@ -1039,7 +1110,7 @@ export function build(S, opts = {}) {
   const profile = opts.intake || coach.profile || null;
   const p = {
     coach_contract: CONTRACT,
-    task: opts.kind === 'review' ? 'review' : opts.kind === 'debrief' ? 'debrief' : opts.kind === 'digest' ? 'digest' : opts.kind === 'adjust' ? 'adjust' : 'create',
+    task: opts.kind === 'review' ? 'review' : opts.kind === 'debrief' ? 'debrief' : opts.kind === 'digest' ? 'digest' : opts.kind === 'adjust' ? 'adjust' : opts.kind === 'live' ? 'live' : 'create',
     meta: {
       profile: opts.handle,
       // Both are short codes in any real state; cut anyway, since the state is the client's.
@@ -1067,7 +1138,7 @@ export function build(S, opts = {}) {
     .flatMap(e => (e.decisions || []).filter(d => d.status === 'rejected').map(d => ({ type: word(d.type, PROFILE_WORD_MAX), why: text(d.why, PROFILE_TEXT_MAX.notes) })))
     .slice(-15);
   // A note on a week proposes nothing, so there is nothing for it to propose again.
-  if (declined.length && opts.kind !== 'digest' && opts.kind !== 'adjust') p.previouslyDeclined = declined;
+  if (declined.length && opts.kind !== 'digest' && opts.kind !== 'adjust' && opts.kind !== 'live') p.previouslyDeclined = declined;
 
   if (opts.kind === 'digest') {
     // One week, read whole: every session in full, the stall and mark picture as it stood on
@@ -1119,6 +1190,43 @@ export function build(S, opts = {}) {
     if (seen) p.observations = seen;
     p.bodyweight = { goal: num(S.targetW) ?? null, series: weighIns(S, iso(since), null) };
     if (opts.note) p.userNote = String(opts.note).slice(0, MAX_NOTE_CHARS);
+  } else if (opts.kind === 'live') {
+    // A question asked during a session: the session as it stands, and for its exercises what
+    // the log says — the last times they were trained, what each lift is at, how often they
+    // stalled, what was marked on them. Kept small on purpose: someone is standing between two
+    // sets, and the answer is worth less with every second it takes.
+    const live = liveContext(S, opts.live);
+    p.live = live ? liveForPayload(live, opts.focus) : null;
+    const inSession = new Set(live ? live.entries.map(e => e.id) : []);
+    const before = list(S.workouts)
+      .filter(w => w && typeof w === 'object' && day(w.d) && entriesOf(w).some(en => inSession.has(ident(en.id))))
+      .slice(-LIVE_PREVIOUS);
+    p.previous = before.map(w => {
+      const c = cleanWorkout(w);
+      return { ...c, entries: c.entries.filter(en => inSession.has(en.id)) };
+    });
+    const stalled = aggregates(S, []).exercises.filter(e => inSession.has(e.id));
+    if (stalled.length) p.aggregates = { exercises: stalled };
+    const facts = lifts(S, inSession);
+    if (facts.length) p.lifts = facts;
+    const seen = observations(S, inSession);
+    if (seen) p.observations = seen;
+    // Where the plan stands: the week of the cycle and what it is for, and the programme it
+    // follows, so a load asked about can be held against that programme's own arithmetic.
+    const cyc = cycleState(S, coach, p.plan);
+    if (cyc) {
+      p.cycle = cycleForPayload(cyc, p.plan, p.meta.today, { full: false });
+      const entry = cyc.program?.id ? programBrief(cyc.program.id) : null;
+      if (entry) p.program = entry;
+    }
+    if (opts.note) p.userNote = String(opts.note).slice(0, MAX_NOTE_CHARS);
+    const said = liveThread(opts.thread);
+    if (said.length) p.thread = said;
+    // What a swap can bring in: the session's own exercises, the movements they just named, and
+    // other exercises of the movement they are asking about — a taken bench is answered with
+    // another press, and that has to be among the candidates.
+    const asked = live?.entries.find(e => e.entry === p.live.at);
+    p.library = librarySlice(S, p.coachProfile?.equipment, { keep: [...inSession], max: 60, texts: [opts.note, asked?.name] });
   } else if (opts.kind === 'debrief') {
     // One session, read closely: the workout itself, the last few times the same routine was
     // trained, and the stall picture for the exercises in it. No library — a debrief changes
@@ -1231,8 +1339,9 @@ export function build(S, opts = {}) {
     }
   }
   // A weekly note and a session's debrief read no conversation; a daily look does, because
-  // what they typed to the Coach yesterday is part of how they are doing.
-  if (opts.kind !== 'debrief' && opts.kind !== 'digest') {
+  // what they typed to the Coach yesterday is part of how they are doing. A question during a
+  // session has a thread of its own.
+  if (opts.kind !== 'debrief' && opts.kind !== 'digest' && opts.kind !== 'live') {
     const said = conversation(coach, [opts.note, opts.refine]);
     if (said.length) p.conversation = said;
   }

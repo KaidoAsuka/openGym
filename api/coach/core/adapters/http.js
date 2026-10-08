@@ -127,7 +127,10 @@ export function httpAdapter(spec) {
       const chosen = model || meta.defaultModel;
       if (!chosen) return { code: 1, text: '', stderr: `no model chosen for ${id} (pick one from the list the endpoint serves)` };
 
-      let body = spec.body({ model: chosen, prompt, system: system || null, schema: schema || null, maxTokens: MAX_OUTPUT_TOKENS });
+      // A caller that knows its answer is short (a few sentences during a session) may ask for
+      // a lower limit; never a higher one.
+      const maxTokens = Number.isInteger(opts.maxTokens) && opts.maxTokens > 0 ? Math.min(opts.maxTokens, MAX_OUTPUT_TOKENS) : MAX_OUTPUT_TOKENS;
+      let body = spec.body({ model: chosen, prompt, system: system || null, schema: schema || null, maxTokens });
       let retriedWithoutJsonMode = false;
       let transientRetries = 0;
       for (;;) {

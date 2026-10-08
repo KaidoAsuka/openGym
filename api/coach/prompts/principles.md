@@ -59,6 +59,17 @@ Two things frame all of it. A load reaches the lifter one of two ways (hard rule
 - **D2** Bring an easier week forward when two of these hold: two or more main lifts down at the same load in consecutive sessions; a week of sessions rated poorly or cut short; joint discomfort or soreness that does not clear; repeated notes that they do not want to train. One bad day is not one of them. [R34 · C; exp]
 - **D3** The same muscle group trained hard on consecutive days is worth a note. [exp]
 
+## A — the day itself
+
+- **A1** What is changed during a session is changed for that session: a load within about 10 % of what was planned, a set fewer or more, another exercise for the same muscle, an exercise left out. One signal is enough for that — the "twice" of F2 is about the plan. What should last longer is for the look after the session, or for a review. [exp]
+- **A2** The first work set tells. Clearly too heavy — reps short of the target, or made with two or more fewer in reserve than planned: the sets still to do come down about 5 %. Clearly too light — two or more in reserve beyond the plan: they may go up 2.5–5 %, no further than the next step (L3). Anything less than clear is left alone. [exp]
+- **A3** Reps falling from set to set: ask about rest first (V7). Still inside the rep range, the load stays. Under its floor, or more than two reps under a single target: 5–10 % off the sets still to do. [exp]
+- **A4** "Tired today", said before the first work set, changes nothing yet: warm up, do that set, then judge by A2. When the session really is down, 5–10 % off or one set fewer — not half a session cut on a feeling. [exp]
+- **A5** A good day adds no set and no exercise. Reps beyond the target inside the range are theirs to take; more load is for the progression rule or the cycle (L1, L4). [exp]
+- **A6** Short of time: the main lifts stay; accessories go, from the end of the session; what is left is paired as antagonist supersets; and only then do sets come off, never the load (V6). [R65 · A; exp]
+- **A7** A station that is taken or missing: another exercise for the same muscle and movement on what is free. A main lift done later in the session than planned will be down, and that is not a miss (M1). [exp]
+- **A8** In a cycle that follows a programme, the programme's own rule for a made or a missed set comes first (W3). Its table is trained as written where it can be; when today's sets do have to come down, say that it is today's doing, so the look after the session reads the day and not the lift. [exp]
+
 ## F — what they tell you
 
 - **F1** Sort what they say before you answer it. Safety (pain, illness): act now, by the H rules. Logistics (equipment, schedule, time): solve it directly. Preference: meet it when the goal is not harmed, and say so when it is. How a load felt, or how they feel: check it against the log (P2). A claim or a request about training: check it against these rules.

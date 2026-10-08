@@ -29,7 +29,7 @@ test('the rules half of the prompt is byte-identical across jobs of the same tas
 test('every task opens with the same reading rules and training principles, so that much is one shared prefix', () => {
   const p = build(S([workout('2026-08-01')]), { handle: 'h1', kind: 'review' });
   const shared = PROMPTS.common + '\n\n---\n\n' + PROMPTS.principles + '\n\n---\n\n';
-  for (const [kind, payload] of [['review', p], ['debrief', p], ['digest', p], ['create', p], ['create', { ...p, refine: { text: 'x' } }]]) {
+  for (const [kind, payload] of [['review', p], ['debrief', p], ['digest', p], ['live', p], ['create', p], ['create', { ...p, refine: { text: 'x' } }]]) {
     const { system, task } = buildPromptParts(kind, payload);
     assert.ok(system.startsWith(shared), task);
     assert.equal(system, shared + PROMPTS[task]);
@@ -53,13 +53,14 @@ test('buildPrompt is exactly the two parts joined, so the CLI adapters lose noth
 });
 
 test('every task has a flat schema — no $ref, no anyOf/oneOf (llama.cpp grammar limits)', () => {
-  for (const task of ['review', 'create', 'refine', 'debrief', 'digest']) {
+  for (const task of ['review', 'create', 'refine', 'debrief', 'digest', 'live']) {
     const text = JSON.stringify(SCHEMAS[task]);
     assert.ok(text.length > 50, task);
     assert.ok(!/\$ref|anyOf|oneOf|allOf/.test(text), task);
   }
   assert.equal(taskOf('review', {}), 'review');
   assert.equal(taskOf('digest', {}), 'digest');
+  assert.equal(taskOf('live', {}), 'live');
   assert.equal(taskOf('create', { refine: 'x' }), 'refine');
 });
 

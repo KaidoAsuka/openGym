@@ -19,7 +19,7 @@ import crypto from 'node:crypto';
 import * as cfgStore from './config.js';
 import { adapterFor } from './adapters/index.js';
 import * as payloadLib from './core/payload.js';
-import { runPipeline } from './core/pipeline.js';
+import { runPipeline, attemptOnce } from './core/pipeline.js';
 import { extractJSON } from './core/parse.js';
 import { hashPlan } from './core/plan-hash.js';
 import { buildPrompt } from './core/prompt.js';
@@ -53,7 +53,9 @@ const userFile = uid => path.join(COACH_DIR, safe(uid) + '.json');
 // them into its own state (digest.js).
 // `adjustments` are the daily looks at a running cycle, held the same way (adjust.js), and
 // `adjustSeen` the last session one was made for.
-const EMPTY = { daily: null, current: null, pending: null, history: [], digests: [], adjustments: [], adjustSeen: null };
+// `liveDaily` counts the questions asked during sessions today, and `liveLast` is the latest
+// answer to one, kept for a phone whose request died on the way back (liveTurn).
+const EMPTY = { daily: null, current: null, pending: null, history: [], digests: [], adjustments: [], adjustSeen: null, liveDaily: null, liveLast: null };
 
 export function readUser(uid) {
   try { return { ...EMPTY, ...JSON.parse(fs.readFileSync(userFile(uid), 'utf8')) }; }
@@ -78,12 +80,15 @@ function patchUser(uid, patch) {
  *  is cancelled where the adapter can be (the HTTP ones — a spawned runtime runs to its end),
  *  and either way finishes without writing anything back (see finish). */
 export function clearUser(uid) {
-  const { daily } = readUser(uid);
+  const { daily, liveDaily } = readUser(uid);
   try { fs.unlinkSync(userFile(uid)); } catch { /* nothing to clear */ }
-  if (daily?.date === todayISO()) writeUser(uid, { ...EMPTY, daily });
+  // The questions asked during sessions are counted apart and kept for the same reason.
+  const spent = { ...(daily?.date === todayISO() ? { daily } : {}), ...(liveDaily?.date === todayISO() ? { liveDaily } : {}) };
+  if (Object.keys(spent).length) writeUser(uid, { ...EMPTY, ...spent });
   const queued = queue.findIndex(j => j.uid === uid);
   if (queued >= 0) { queue.splice(queued, 1); inflight.delete(uid); }
   aborts.get(uid)?.abort();
+  liveAborts.get(uid)?.abort();
   forgetSeq.set(uid, (forgetSeq.get(uid) || 0) + 1);
   invalidateCohort();
 }
@@ -213,6 +218,8 @@ let running = 0;
 const inflight = new Set();     // uids with a job queued or running (FR-07 single-flight)
 const forgetSeq = new Map();    // uid → bumped by every clearUser; a job carries the value it saw at enqueue
 const aborts = new Map();       // uid → AbortController of the provider call in flight, for clearUser to pull
+const liveBusy = new Set();     // uids with a question asked during a session being answered (liveTurn)
+const liveAborts = new Map();   // uid → AbortController of that call, for clearUser to pull
 
 class CoachError extends Error {
   constructor(code, message) { super(message); this.code = code; }
@@ -233,13 +240,12 @@ export function clampMessage(text) {
 }
 
 /**
- * Enqueue a job. Throws CoachError with a code the routes layer maps to an HTTP status:
- * `off`, `busy`, `cap`, `consent`.
+ * What stands between a profile and any call to the provider, whichever way the call is made —
+ * queued as a job, or answered in the request that asked (liveTurn). Stated once so the two
+ * cannot drift. Throws CoachError (`consent`, `shared`, `off`, `unprivileged`); returns the
+ * profile's state.
  */
-export function enqueue(uid, opts) {
-  if (!cfgStore.isEnabled() || !cfgStore.isConnected()) throw new CoachError('off', 'the Coach is not set up on this instance');
-  if (inflight.has(uid)) throw new CoachError('busy', 'the Coach is already thinking about your training');
-
+function admit(uid) {
   const S = readState(uid);
   // Consent is enforced here, server-side, not by the screen that collects it: a UI-only gate
   // is not a gate (FR-08/13).
@@ -265,6 +271,18 @@ export function enqueue(uid, opts) {
     const priv = canDropPrivileges();
     if (!priv.ok) throw new CoachError('unprivileged', `Coach jobs are disabled: ${priv.why}`);
   }
+  return S;
+}
+
+/**
+ * Enqueue a job. Throws CoachError with a code the routes layer maps to an HTTP status:
+ * `off`, `busy`, `cap`, `consent`.
+ */
+export function enqueue(uid, opts) {
+  if (!cfgStore.isEnabled() || !cfgStore.isConnected()) throw new CoachError('off', 'the Coach is not set up on this instance');
+  if (inflight.has(uid)) throw new CoachError('busy', 'the Coach is already thinking about your training');
+
+  admit(uid);
 
   const caps = cfgStore.load().caps || {};
   const { used, limit } = capState(uid);
@@ -481,6 +499,131 @@ export function resolvePending(uid, { accepted = [], rejected = [], dismissed = 
   }].slice(-HISTORY_MAX);
   writeUser(uid, { ...rec, pending: null, history });
   return { ok: true };
+}
+
+/* ---------- a question during a session ----------
+   Someone standing between two sets cannot wait behind a queue built for jobs that take their
+   minutes, nor behind their own weekly note being written. So this lane does not queue: the
+   provider is called in the request that asked, and the answer goes back in its response
+   (prompts/live.md, core/live.js). Everything that guards a job guards it too (admit); it is
+   counted against a cap of its own, one question at a time for a profile.
+
+   Nothing is kept of it but the count and the latest answer. The thread lives on the phone, with
+   the session. The answer is kept so that a request which died on its way back — a gym's wifi —
+   can be made again under the same `turnId` and be given what was already paid for. */
+export const LIVE_TIMEOUT_MS = Math.max(15000, +process.env.COACH_LIVE_TIMEOUT_MS || 90000);
+// A second try (the one repair round) is not started with less than this left of the budget.
+const LIVE_REPAIR_MIN_MS = 10000;
+const LIVE_MAX_CONCURRENT = 2;
+// A few sentences and four ops; a model that runs on past that has lost the thread.
+const LIVE_MAX_TOKENS = 2000;
+const LIVE_KEPT_MS = 15 * 60000;
+
+export function liveCapState(uid) {
+  const limit = (cfgStore.load().caps || {}).livePerProfileDaily;
+  const rec = readUser(uid);
+  const used = rec.liveDaily?.date === todayISO() ? rec.liveDaily.count : 0;
+  return { used, limit: Number.isFinite(limit) ? limit : cfgStore.LIVE_DAILY_DEFAULT };
+}
+function bumpLiveDaily(uid) {
+  const { liveDaily } = readUser(uid);
+  const d = todayISO();
+  patchUser(uid, { liveDaily: liveDaily?.date === d ? { date: d, count: liveDaily.count + 1 } : { date: d, count: 1 } });
+}
+
+/**
+ * Answer one question asked during a session.
+ *
+ * @param {string} uid
+ * @param {object} opts  `text`: what they typed; `live`: the session as the phone holds it (its
+ *                       own `S.active`); `focus`: the entry the question was asked from;
+ *                       `thread`: what was said earlier in the session; `turnId`: the phone's id
+ *                       for this question; `lang`
+ * @returns {Promise<{ id, reply, ops, flags, cap }>}
+ * Throws CoachError: what enqueue throws, and `empty`, `nolive`, `livecap`, `toolarge`, or the
+ * class the call failed with (`timeout`, `provider`, `auth`, `missing`, `unusable`, `forgotten`).
+ */
+export async function liveTurn(uid, opts = {}) {
+  if (!cfgStore.isEnabled() || !cfgStore.isConnected()) throw new CoachError('off', 'the Coach is not set up on this instance');
+  const text = clampMessage(typeof opts.text === 'string' ? opts.text.trim() : '');
+  if (!text) throw new CoachError('empty', 'there is no question to answer');
+  const turnId = typeof opts.turnId === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(opts.turnId) ? opts.turnId : null;
+
+  // Asked again under the same id: the answer already paid for, not a second call.
+  const kept = readUser(uid).liveLast;
+  if (turnId && kept?.turnId === turnId && kept.at > Date.now() - LIVE_KEPT_MS) return { ...kept.answer, cap: liveCapState(uid) };
+  if (liveBusy.has(uid)) throw new CoachError('busy', 'the Coach is still answering your last question');
+  if (liveBusy.size >= LIVE_MAX_CONCURRENT) throw new CoachError('busy', 'the Coach is answering someone else — ask again in a moment');
+
+  const S = admit(uid);
+  const live = payloadLib.liveContext(S, opts.live);
+  if (!live) throw new CoachError('nolive', 'there is no session under way to ask about');
+
+  const { used, limit } = liveCapState(uid);
+  if (limit > 0 && used >= limit) throw new CoachError('livecap', 'daily limit for questions during a session reached');
+  const caps = cfgStore.load().caps || {};
+  if (caps.instanceDaily > 0 && instanceUsedToday() >= caps.instanceDaily) throw new CoachError('cap', 'this instance has reached its daily limit');
+
+  const cfg = cfgStore.load();
+  const adapter = adapterFor(cfg.provider);
+  if (!adapter) throw new CoachError('off', 'the Coach is not set up on this instance');
+  const payload = payloadLib.build(S, {
+    handle: handleFor(uid), kind: 'live', live: opts.live, focus: opts.focus, thread: opts.thread, note: text,
+    lang: payloadLib.langTag(opts.lang) || (S.langAuto === true ? payloadLib.langTag(process.env.DEFAULT_LANG) : null)
+  });
+  if (JSON.stringify(payload).length > payloadLib.MAX_PAYLOAD_CHARS) throw new CoachError('toolarge', 'the session is too large to send');
+
+  // Counted when the call is about to be made, as a job is at enqueue.
+  bumpLiveDaily(uid);
+  bumpInstanceDaily();
+
+  const id = crypto.randomBytes(8).toString('hex');
+  const seq = forgetSeq.get(uid) || 0;
+  const startedAt = Date.now();
+  const jobDir = adapter.spawns === false ? null : fs.mkdtempSync(path.join(os.tmpdir(), 'coach-'));
+  const env = cfgStore.jobEnv(jobDir || os.tmpdir(), cfgStore.credentialFor(uid));
+  const ctl = new AbortController();
+  liveBusy.add(uid);
+  liveAborts.set(uid, ctl);
+  let attempt;
+  try {
+    const ids = jobDir && unprivilegedIds();
+    if (ids) shareJobDir(jobDir, ids);
+    const call = {
+      adapter, cfg, kind: 'live', payload, live, model: cfgStore.liveModelFor(cfg), timeoutMs: LIVE_TIMEOUT_MS,
+      invokeOpts: { jobDir, env, fetch: fetchFor(TIMEOUT_MS), signal: ctl.signal, maxTokens: LIVE_MAX_TOKENS }
+    };
+    // runPipeline's loop, held to one budget for both tries: a repair round that starts when
+    // the first answer took most of the time would keep them waiting twice as long.
+    attempt = await attemptOnce(call, null);
+    const left = LIVE_TIMEOUT_MS - (Date.now() - startedAt);
+    if (!attempt.ok && attempt.repairable && left >= LIVE_REPAIR_MIN_MS && !ctl.signal.aborted) {
+      attempt = await attemptOnce({ ...call, timeoutMs: left }, { previous: attempt.raw, errors: attempt.errors });
+    }
+  } catch (e) {
+    console.error('coach live turn crashed', id, e);
+    attempt = { ok: false, errorClass: 'internal' };
+  } finally {
+    liveBusy.delete(uid);
+    liveAborts.delete(uid);
+    if (jobDir) removeJobDir(jobDir, unprivilegedIds());
+  }
+
+  // Forgotten while it ran: nothing is kept and nothing is handed back, as for a job (finish).
+  const forgotten = (forgetSeq.get(uid) || 0) !== seq;
+  if (!attempt.ok || forgotten) {
+    const errorClass = forgotten || ctl.signal.aborted ? 'forgotten' : attempt.errorClass || 'internal';
+    // Failures only: the instance log keeps its last hundred lines, and a session's questions
+    // would push every job out of it. What was asked is counted in `daily` either way.
+    cfgStore.logJob({
+      at: new Date().toISOString(), uid, kind: 'live', trigger: 'manual', outcome: 'failed', errorClass,
+      ms: Date.now() - startedAt, detail: attempt.detail || null
+    });
+    throw new CoachError(errorClass, 'the Coach could not answer');
+  }
+  const answer = { id, ...attempt.result };
+  patchUser(uid, { liveLast: turnId ? { turnId, at: Date.now(), answer } : null });
+  return { ...answer, cap: liveCapState(uid) };
 }
 
 /* ---------- admin test + boot recovery ---------- */

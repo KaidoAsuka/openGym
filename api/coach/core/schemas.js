@@ -173,4 +173,33 @@ export const ADJUST_SCHEMA = {
   required: ['coach_contract']
 };
 
-export const SCHEMAS = { review: REVIEW_SCHEMA, create: CREATE_SCHEMA, refine: CREATE_SCHEMA, debrief: DEBRIEF_SCHEMA, digest: DIGEST_SCHEMA, adjust: ADJUST_SCHEMA };
+// An answer given during a session: a few sentences, ops on the session itself (core/live.js)
+// and marks for what was just said about an exercise. The counts are live.js's LIVE_OPS_MAX and
+// LIVE_FLAGS_MAX, stated here for the reason the create schema states its own.
+export const LIVE_SCHEMA = {
+  type: 'object',
+  properties: {
+    coach_contract: { type: 'integer' },
+    reply: STR,
+    ops: {
+      type: 'array',
+      maxItems: 4,
+      items: {
+        type: 'object',
+        properties: {
+          op: STR, entry: { type: 'integer' }, exId: STR, to: STR, count: { type: 'integer' },
+          sets: { type: 'integer' }, reps: { type: 'integer' }, sec: { type: 'integer' }, weight: { type: 'number' }, why: STR
+        },
+        required: ['op', 'entry', 'exId', 'why']
+      }
+    },
+    flags: {
+      type: 'array',
+      maxItems: 3,
+      items: { type: 'object', properties: { entry: { type: 'integer' }, exId: STR, flag: STR }, required: ['entry', 'exId', 'flag'] }
+    }
+  },
+  required: ['coach_contract', 'reply']
+};
+
+export const SCHEMAS = { review: REVIEW_SCHEMA, create: CREATE_SCHEMA, refine: CREATE_SCHEMA, debrief: DEBRIEF_SCHEMA, digest: DIGEST_SCHEMA, adjust: ADJUST_SCHEMA, live: LIVE_SCHEMA };

@@ -14,11 +14,14 @@
  * model verbatim for the one repair round (FR-48) — and a list of six problems produces a
  * better second attempt than the first of them does.
  */
-import { libraryHas, libraryName } from './library.js';
+import { libraryHas, libraryName, LIB_BY_ID } from './library.js';
 import { glyphStr } from './glyphs.js';
 import { planLoadFindings, findingErrors, advisoriesOf, isHardFinding, changeLoadErrors, customBodyParts } from './plan-load.js';
 import { programCard } from './kb.js';
 import { cleanCyclePlan, cleanChanges, planAt, baseOf, withChanges, CYCLE_WEEKS_MAX, ADJUST_SUMMARY_MAX, ADJUST_NOTES_MAX } from './cycle.js';
+import { cleanOps, LIVE_REPLY_MAX } from './live.js';
+// The marks an exercise can carry — the list the phone's own is pinned to.
+import { FLAG_KINDS } from './payload.js';
 
 // The closed list (FR-23 / C3). Adding a member here is a deliberate act with an apply
 // implementation on the client to match; there is no default case anywhere.
@@ -756,6 +759,39 @@ export function validateAdjust(data, ctx = {}) {
       ...(notes.length ? { notes } : {})
     }
   };
+}
+
+/* =============================== a session under way =============================== */
+
+/**
+ * Validate an answer given during a session: a few sentences, and ops on the session itself.
+ *
+ * The ops are core/live.js's closed list and reach no further than the session the phone sent.
+ * The plan and the cycle cannot be changed from here; an answer that tries is refused, so that
+ * what the reply says was done and what the cards offer cannot come apart. A weight is held to
+ * being a weight and no more: whether it is the right one is the Coach's to judge against the
+ * programme and the log, as in a cycle.
+ *
+ * `ctx.live` is payload.js liveContext; `ctx.customIds` and `ctx.names` are the person's own
+ * exercises, which a swap may bring in as well as the catalogue's.
+ * Returns { ok, proposal:{ reply, ops, flags } } | { ok:false, errors }.
+ */
+export function validateLive(data, ctx = {}) {
+  if (!data || typeof data !== 'object') return fail(['the answer was not an object']);
+  if (!ctx.live) return fail(['no session is under way, so there is nothing to answer about']);
+  const errors = [];
+  if (!isStr(data.reply)) errors.push('reply is required — answer what they asked in a few sentences, the conclusion and its number first');
+  if (Array.isArray(data.changes) && data.changes.length) {
+    errors.push('an answer during a session carries no plan changes — what should change today goes in "ops"; what should change in the plan is a review\'s, so say it in "reply"');
+  }
+  const own = new Set(ctx.customIds || []);
+  const names = ctx.names || {};
+  const lookup = id => (libraryHas(id) ? { name: libraryName(id), cardio: LIB_BY_ID.get(id).bp === 'cardio' }
+    : own.has(id) ? { name: isStr(names[id]) ? clampStr(names[id], 80) : null, cardio: false } : null);
+  const read = cleanOps(data, ctx.live, { lookup, flagKinds: FLAG_KINDS });
+  errors.push(...read.errors);
+  if (errors.length) return fail(errors);
+  return { ok: true, proposal: { reply: cutText(data.reply, LIVE_REPLY_MAX), ops: read.ops, flags: read.flags } };
 }
 
 /* =============================== workout debriefs =============================== */

@@ -141,6 +141,20 @@ if (kind === 'adjust') {
   });
 }
 
+// live: a question asked during a session — a line back that echoes where they are, and one op
+// on the first exercise that still has work sets to do, so a test can check the session arrived.
+if (kind === 'live') {
+  const L = P.live || {};
+  const e = (L.entries || []).find(x => x.setsLeft > 0);
+  if (!e) out({ coach_contract: 1, reply: 'Every set of the session is done — nothing is left to change today.' });
+  out({
+    coach_contract: 1,
+    reply: `${e.name || 'That exercise'}: ${e.setsDone} done, ${e.setsLeft} to go. ${e.setsLeft > 1 ? 'Take one set off and keep the load.' : 'Leave it there for today.'}`,
+    ops: [{ op: e.setsLeft > 1 ? 'remove-set' : 'skip', entry: e.entry, exId: e.id, why: 'The fixture always answers with the smallest change it can make.' }],
+    flags: (P.userNote || '').toLowerCase().includes('heavy') ? [{ entry: e.entry, exId: e.id, flag: 'heavy' }] : []
+  });
+}
+
 // digest: one week written up, with the counts it was handed echoed so a test can check they arrived
 if (kind === 'digest') {
   const w = P.week || {};

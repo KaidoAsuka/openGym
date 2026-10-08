@@ -295,6 +295,12 @@ on every job, like the stall count, and does not stop at the last review. The pr
 review to act on the same mark twice, to treat one mark as one session, and to act on pain the
 first time.
 
+**The session in progress.** A question asked during a session sends that session as the phone
+holds it: each exercise's target, the sets logged so far with their effort, and the marks and
+note on it, plus the question and the last eight lines of that session's own conversation. It
+is training data like the log it will become, read by name and cut the same way, and it is the
+only time a session that is not finished leaves the device.
+
 Excluded on purpose and permanently: **display name and user id, passkey and credential
 material, push subscriptions, invite data, theme and appearance settings, and every other
 profile's everything.**
@@ -336,8 +342,8 @@ you that has not:
 
 **Training principles, and the two that are arithmetic.** Every task's system prompt carries
 `api/coach/prompts/principles.md` between the reading rules and the task: what wins when rules
-pull apart, how much work and how hard, strength work, progression, stalls, easier weeks, how to
-treat what you tell it, and safety. Each rule has a number (V1, M3, …) the Coach may put in
+pull apart, how much work and how hard, strength work, progression, stalls, easier weeks, what
+may be adjusted on the day itself, how to treat what you tell it, and safety. Each rule has a number (V1, M3, …) the Coach may put in
 brackets after a reason, and the sources it rests on. Most of it is judgement and stays advice.
 Two rules are sums, and `api/coach/core/plan-load.js` does them rather than the model:
 
@@ -409,6 +415,42 @@ One look per session, counted against the daily cap like any other job; you can 
 one from the cycle's own screen. A phone that brings its own key has no scheduler, so there a
 look happens only when asked for.
 
+**A question during a session.** `POST /api/coach/live` takes a question asked between two sets
+— the bar felt heavy, the rack is taken, twenty minutes are left — and answers it in the same
+request. It is not a job: someone waiting for their next set cannot wait behind a queue built
+for work that takes minutes, so nothing is queued and the status poll never hears of it. The
+server holds no session in progress (a sync drops it on the way in), so the app sends the one
+it has, and it is read field by field like any other state a client wrote. Beside it the Coach
+gets what your log says about that session's exercises — the last two sessions that held them,
+what each lift is at, stalls, marks — the week of the cycle, and the programme it follows.
+
+The answer is a few sentences and, when the session itself should change, up to four **ops**
+from a closed list of five (`api/coach/core/live.js`): change the weight or reps of the sets
+still to do, take a set off, add one, swap the exercise for another, or skip it. An op is a
+suggestion the app shows and you apply. It can only name an exercise of the session that was
+sent, by its position and its id together; a set that is done cannot be changed; an exercise
+swapped in must exist and not already be in the session. A weight is checked for being a weight
+and nothing more, as in a cycle. Nothing here reaches the plan or the cycle: what a session says
+about the weeks to come is read after it is finished, by the daily look. The answer may also
+carry marks (too heavy, equipment taken, …) for what you just said about an exercise, so the
+remark is counted the way a mark you set yourself is.
+
+- **What it costs.** One provider call per question, two when the first answer had to be
+  repaired, both inside one budget of 90 seconds (`COACH_LIVE_TIMEOUT_MS`). Counted against a
+  cap of its own, `livePerProfileDaily` (30 a day by default, 0 for none), so a session's
+  questions do not use up the day's reviews; the instance's daily cap counts them too. One
+  question at a time for a profile, and it does not wait for a job that is running.
+- **Which model.** The provider's own, unless `liveModel` is set for it
+  (`POST /api/admin/coach/config`): a quicker model for the answers someone is standing and
+  waiting for.
+- **What is kept.** The day's count, and the latest answer for fifteen minutes, so a request
+  that died on its way back can be sent again under the same `turnId` without a second call.
+  The thread of the conversation is the app's to keep, with the session. An answered question
+  leaves no line in the instance log; a failed one leaves its class and duration, never its text.
+
+The screen for it is not built yet: the route, the ops and the checks are, and the fixture
+provider answers them.
+
 A rejected answer gets **one** repair round, with the errors handed back verbatim. Two failures
 is a provider problem rather than a prompting problem, and a retry loop against a paid account
 is a bad way to find that out.
@@ -424,7 +466,8 @@ promising minutes when the endpoint is a local one. The phone's BYOK mode does t
 its own: a local endpoint gets 25 minutes there.
 
 The Coach may only touch **routines and the week**. Your training log, your weigh-ins and your
-settings are not reachable from any change type that exists.
+settings are not reachable from any change type that exists. The ops of a question during a
+session are a separate list and reach only the session in progress, one tap at a time.
 
 Applying happens **on the client**, not the server — ordinary local editing, so it works
 offline, syncs like everything else, and stays reversible without the server knowing. Every

@@ -22,9 +22,25 @@ const USER_ERROR = {
   // Verbatim, because it tells the user the one thing that resolves it and names who resolves
   // it. A vaguer message here turns into a support question for the person running the box.
   shared: cfgStore.SHARED_ACCOUNT_REFUSAL,
-  unprivileged: 'the Coach is switched off on this instance for safety reasons'
+  unprivileged: 'the Coach is switched off on this instance for safety reasons',
+  // A question asked during a session is answered in its own request, so what a job reports
+  // through the status poll comes back here as the answer to the request itself.
+  empty: 'there is no question to answer',
+  nolive: 'there is no session under way to ask about',
+  livecap: 'the Coach has answered all it can during sessions today — try again tomorrow',
+  toolarge: 'this session is too large for the Coach to read',
+  timeout: 'the Coach took too long and gave up',
+  auth: 'the Coach could not sign in to its provider',
+  missing: 'the Coach is not installed properly on this instance',
+  provider: 'the Coach could not run',
+  unusable: 'the Coach answered with something the app could not use',
+  forgotten: 'the Coach was switched off for this profile while it was answering',
+  internal: 'something went wrong on the server'
 };
-const HTTP_FOR = { off: 503, busy: 409, cap: 429, consent: 403, shared: 409, unprivileged: 503 };
+const HTTP_FOR = {
+  off: 503, busy: 409, cap: 429, consent: 403, shared: 409, unprivileged: 503,
+  empty: 400, nolive: 400, livecap: 429, toolarge: 413, timeout: 504, auth: 502, missing: 503, provider: 502, unusable: 502, forgotten: 409, internal: 500
+};
 
 export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
   /** Every user route starts the same way: signed in, feature on, feature reachable. The class
@@ -110,6 +126,22 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
       } catch (e) { failEnqueue(res, e); }
     },
 
+    // A question asked during a session, answered in this request: no job is queued, and the
+    // status poll never hears of it (jobs.liveTurn). `session` is the session as the phone holds
+    // it — the server has none of its own while one is under way — and is read field by field
+    // like any other client-written state (payload.js liveContext). What comes back is a few
+    // sentences and ops on that session, which the phone applies when they are tapped.
+    'POST /api/coach/live': async (req, res) => {
+      const user = guard(req, res); if (!user) return;
+      const body = await readBody(req);
+      try {
+        json(res, 200, await jobs.liveTurn(user.id, {
+          text: typeof body.text === 'string' ? body.text.slice(0, cfgStore.MAX_MESSAGE_LEN_CEILING) : null,
+          live: body.session, focus: body.focus, thread: body.thread, turnId: body.turnId, lang: body.lang
+        }));
+      } catch (e) { failEnqueue(res, e); }
+    },
+
     // One workout, read closely. Nothing to apply — the card is kept in the user's log.
     'POST /api/coach/debrief': async (req, res) => {
       const user = guard(req, res); if (!user) return;
@@ -178,6 +210,8 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
         })),
         model: cfgStore.modelFor(cfg),
         models: cfg.models,
+        // The model questions during a session are answered with, when it is not `model`.
+        liveModel: (cfg.liveModels && cfg.liveModels[cfg.provider]) || null,
         baseUrl: cfgStore.providerMeta(cfg).http ? baseUrlFor(cfg.provider, cfg) : null,
         knownModels: check.models || null,
         caps: cfg.caps,
@@ -230,6 +264,10 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
         patch.models = { ...current.models };
         if (body.model) patch.models[target] = String(body.model).slice(0, 80); else delete patch.models[target];
       }
+      if (body.liveModel !== undefined) {
+        patch.liveModels = { ...current.liveModels };
+        if (body.liveModel) patch.liveModels[target] = String(body.liveModel).slice(0, 80); else delete patch.liveModels[target];
+      }
       if (body.baseUrl !== undefined) {
         if (!cfgStore.PROVIDERS[target].baseUrl) return json(res, 400, { error: `${target} has a fixed endpoint` });
         const v = validateBaseUrl(body.baseUrl);
@@ -245,7 +283,11 @@ export function coachRoutes({ json, readBody, readSession, requireAdmin }) {
       if (body.caps) {
         patch.caps = {
           perProfileDaily: Math.max(0, Math.min(200, +body.caps.perProfileDaily || 0)),
-          instanceDaily: Math.max(0, Math.min(5000, +body.caps.instanceDaily || 0))
+          instanceDaily: Math.max(0, Math.min(5000, +body.caps.instanceDaily || 0)),
+          // The card that does not send this one yet must not reset it by saving the other two.
+          livePerProfileDaily: body.caps.livePerProfileDaily !== undefined
+            ? Math.max(0, Math.min(500, +body.caps.livePerProfileDaily || 0))
+            : (current.caps?.livePerProfileDaily ?? cfgStore.LIVE_DAILY_DEFAULT)
         };
       }
       if (body.maxMessageLen !== undefined) {

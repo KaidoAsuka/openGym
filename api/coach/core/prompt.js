@@ -4,7 +4,7 @@
 import { PROMPTS } from './prompts.js';
 
 export const taskOf = (kind, payload) =>
-  kind === 'review' ? 'review' : kind === 'debrief' ? 'debrief' : kind === 'digest' ? 'digest' : kind === 'adjust' ? 'adjust' : payload && payload.refine ? 'refine' : 'create';
+  kind === 'review' ? 'review' : kind === 'debrief' ? 'debrief' : kind === 'digest' ? 'digest' : kind === 'adjust' ? 'adjust' : kind === 'live' ? 'live' : payload && payload.refine ? 'refine' : 'create';
 
 /**
  * The prompt in two parts: `system` is the rules — byte-identical for every job of the same

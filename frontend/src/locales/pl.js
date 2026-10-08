@@ -2020,4 +2020,10 @@ export default {
   'Week {0}': 'Tydzień {0}',
   'What the Coach changed': 'Co zmienił Trener',
   'Your last session went to plan, so the first lift moves up a rep sooner.': 'Twoja ostatnia sesja poszła zgodnie z planem, więc pierwsze ćwiczenie dostaje dodatkowe powtórzenie wcześniej.',
+  // --- AI Coach: why a question during a workout was refused (lib/coach-api.js JOB_ERRORS) ---
+  'There’s nothing to answer yet. Type your question first.': 'Nie ma jeszcze na co odpowiadać. Najpierw wpisz pytanie.',
+  'There’s no workout under way to ask about.': 'Nie trwa żaden trening, o który można zapytać.',
+  'The Coach has answered all it can during workouts today. Try again tomorrow.': 'Trener odpowiedział dziś na wszystko, na co mógł w trakcie treningów. Spróbuj ponownie jutro.',
+  'This workout is too large for the Coach to read.': 'Ten trening jest za duży, żeby Trener mógł go przeczytać.',
+  'The Coach was switched off for this profile while it was answering.': 'Trener został wyłączony dla tego profilu, gdy odpowiadał.',
 }

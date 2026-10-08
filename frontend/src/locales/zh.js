@@ -2020,4 +2020,10 @@ export default {
   'Week {0}': '第 {0} 周',
   'What the Coach changed': '教练做的调整',
   'Your last session went to plan, so the first lift moves up a rep sooner.': '你上次的训练按计划完成了，所以第一个动作提前多加一次。',
+  // --- AI Coach: why a question during a workout was refused (lib/coach-api.js JOB_ERRORS) ---
+  'There’s nothing to answer yet. Type your question first.': '还没有要回答的内容。先输入你的问题。',
+  'There’s no workout under way to ask about.': '现在没有正在进行的训练可以问。',
+  'The Coach has answered all it can during workouts today. Try again tomorrow.': '教练今天在训练中能回答的次数已经用完。明天再试吧。',
+  'This workout is too large for the Coach to read.': '这次训练内容太多，教练读不了。',
+  'The Coach was switched off for this profile while it was answering.': '教练正在回答时，这个档案的教练被关掉了。',
 }

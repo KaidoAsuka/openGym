@@ -2020,4 +2020,10 @@ export default {
   'Week {0}': '{0}주차',
   'What the Coach changed': '코치가 바꾼 내용',
   'Your last session went to plan, so the first lift moves up a rep sooner.': '지난 운동이 계획대로 진행되어, 첫 번째 운동의 횟수를 한 번 더 일찍 늘립니다.',
+  // --- AI Coach: why a question during a workout was refused (lib/coach-api.js JOB_ERRORS) ---
+  'There’s nothing to answer yet. Type your question first.': '아직 답할 내용이 없어요. 먼저 질문을 입력하세요.',
+  'There’s no workout under way to ask about.': '질문할 진행 중인 운동이 없어요.',
+  'The Coach has answered all it can during workouts today. Try again tomorrow.': '코치가 오늘 운동 중에 답할 수 있는 만큼 모두 답했어요. 내일 다시 시도하세요.',
+  'This workout is too large for the Coach to read.': '이 운동은 코치가 읽기에 너무 커요.',
+  'The Coach was switched off for this profile while it was answering.': '코치가 답하는 동안 이 프로필에서 코치가 꺼졌어요.',
 }

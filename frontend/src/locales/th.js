@@ -2031,4 +2031,10 @@ export default {
   'Week {0}': 'สัปดาห์ที่ {0}',
   'What the Coach changed': 'สิ่งที่โค้ชเปลี่ยน',
   'Your last session went to plan, so the first lift moves up a rep sooner.': 'เซสชันล่าสุดของคุณเป็นไปตามแผน ท่าแรกจึงเพิ่มจำนวนครั้งเร็วขึ้น',
+  // --- AI Coach: why a question during a workout was refused (lib/coach-api.js JOB_ERRORS) ---
+  'There’s nothing to answer yet. Type your question first.': 'ยังไม่มีอะไรให้ตอบ พิมพ์คำถามก่อนนะ',
+  'There’s no workout under way to ask about.': 'ไม่มีการฝึกที่กำลังทำอยู่ให้ถาม',
+  'The Coach has answered all it can during workouts today. Try again tomorrow.': 'วันนี้โค้ชตอบระหว่างการฝึกครบตามที่ทำได้แล้ว ลองใหม่พรุ่งนี้นะ',
+  'This workout is too large for the Coach to read.': 'การฝึกครั้งนี้ใหญ่เกินกว่าที่โค้ชจะอ่านได้',
+  'The Coach was switched off for this profile while it was answering.': 'โค้ชถูกปิดสำหรับโปรไฟล์นี้ระหว่างที่กำลังตอบ',
 }

@@ -2073,4 +2073,10 @@ export default {
   'Week {0}': 'الأسبوع {0}',
   'What the Coach changed': 'ما غيّره المدرب',
   'Your last session went to plan, so the first lift moves up a rep sooner.': 'سارت جلستك الأخيرة وفق الخطة، لذا يحصل التمرين الأول على تكراره الإضافي أبكر.',
+  // --- AI Coach: why a question during a workout was refused (lib/coach-api.js JOB_ERRORS) ---
+  'There’s nothing to answer yet. Type your question first.': 'لا يوجد ما يُجاب عنه بعد. اكتب سؤالك أولًا.',
+  'There’s no workout under way to ask about.': 'لا يوجد تمرين جارٍ للسؤال عنه.',
+  'The Coach has answered all it can during workouts today. Try again tomorrow.': 'أجاب المدرب عن كل ما يستطيع خلال التمارين اليوم. حاول مرة أخرى غدًا.',
+  'This workout is too large for the Coach to read.': 'هذا التمرين أكبر من أن يقرأه المدرب.',
+  'The Coach was switched off for this profile while it was answering.': 'أُوقف المدرب لهذا الملف الشخصي بينما كان يجيب.',
 }

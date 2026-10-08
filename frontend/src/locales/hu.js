@@ -2023,4 +2023,10 @@ export default {
   'Week {0}': '{0}. hét',
   'What the Coach changed': 'Amit az Edző módosított',
   'Your last session went to plan, so the first lift moves up a rep sooner.': 'A legutóbbi edzésed a terv szerint ment, ezért az első gyakorlat hamarabb kap plusz ismétlést.',
+  // --- AI Coach: why a question during a workout was refused (lib/coach-api.js JOB_ERRORS) ---
+  'There’s nothing to answer yet. Type your question first.': 'Még nincs mire válaszolni. Előbb írd be a kérdésed.',
+  'There’s no workout under way to ask about.': 'Nincs folyamatban lévő edzés, amelyről kérdezhetnél.',
+  'The Coach has answered all it can during workouts today. Try again tomorrow.': 'Az Edző ma már mindenre válaszolt, amire edzés közben tudott. Próbáld újra holnap.',
+  'This workout is too large for the Coach to read.': 'Ez az edzés túl nagy ahhoz, hogy az Edző elolvassa.',
+  'The Coach was switched off for this profile while it was answering.': 'Az Edzőt kikapcsolták ennél a profilnál, miközben válaszolt.',
 }

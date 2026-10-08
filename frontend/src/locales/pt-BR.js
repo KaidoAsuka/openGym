@@ -1282,6 +1282,12 @@ export const PT_BR_OVERRIDES = {
   'Week {0}': 'Semana {0}',
   'What the Coach changed': 'O que o Treinador mudou',
   'Your last session went to plan, so the first lift moves up a rep sooner.': 'Sua última sessão saiu como planejado, então o primeiro exercício ganha uma repetição mais cedo.',
+  // --- AI Coach: why a question during a workout was refused (lib/coach-api.js JOB_ERRORS) ---
+  'There’s nothing to answer yet. Type your question first.': 'Ainda não há nada para responder. Escreva sua pergunta primeiro.',
+  'There’s no workout under way to ask about.': 'Não há treino em andamento para perguntar.',
+  'The Coach has answered all it can during workouts today. Try again tomorrow.': 'O Treinador já respondeu tudo o que podia durante os treinos de hoje. Tente de novo amanhã.',
+  'This workout is too large for the Coach to read.': 'Este treino é grande demais para o Treinador ler.',
+  'The Coach was switched off for this profile while it was answering.': 'O Treinador foi desativado para este perfil enquanto respondia.',
 }
 
 export default { ...pt, ...PT_BR_OVERRIDES }

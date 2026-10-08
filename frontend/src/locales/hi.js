@@ -2020,4 +2020,10 @@ export default {
   'Week {0}': 'हफ़्ता {0}',
   'What the Coach changed': 'कोच ने क्या बदला',
   'Your last session went to plan, so the first lift moves up a rep sooner.': 'आपका पिछला सत्र प्लान के मुताबिक रहा, इसलिए पहले व्यायाम में एक रेप पहले ही बढ़ रहा है।',
+  // --- AI Coach: why a question during a workout was refused (lib/coach-api.js JOB_ERRORS) ---
+  'There’s nothing to answer yet. Type your question first.': 'अभी जवाब देने के लिए कुछ नहीं है। पहले अपना सवाल लिखें।',
+  'There’s no workout under way to ask about.': 'अभी कोई वर्कआउट चल नहीं रहा जिसके बारे में पूछा जा सके।',
+  'The Coach has answered all it can during workouts today. Try again tomorrow.': 'कोच आज वर्कआउट के दौरान जितने जवाब दे सकता था, दे चुका है। कल फिर कोशिश करें।',
+  'This workout is too large for the Coach to read.': 'यह वर्कआउट इतना बड़ा है कि कोच इसे पढ़ नहीं सकता।',
+  'The Coach was switched off for this profile while it was answering.': 'जवाब देते समय इस प्रोफ़ाइल के लिए कोच बंद कर दिया गया।',
 }

@@ -2020,4 +2020,10 @@ export default {
   'Week {0}': '{0}. hafta',
   'What the Coach changed': 'Koç’un değiştirdikleri',
   'Your last session went to plan, so the first lift moves up a rep sooner.': 'Son antrenmanın plana uygun gitti, bu yüzden ilk hareket ek tekrarı daha erken alıyor.',
+  // --- AI Coach: why a question during a workout was refused (lib/coach-api.js JOB_ERRORS) ---
+  'There’s nothing to answer yet. Type your question first.': 'Henüz yanıtlanacak bir şey yok. Önce sorunu yaz.',
+  'There’s no workout under way to ask about.': 'Hakkında soru sorulacak, devam eden bir antrenman yok.',
+  'The Coach has answered all it can during workouts today. Try again tomorrow.': 'Koç bugün antrenman sırasında yanıtlayabileceği kadarını yanıtladı. Yarın tekrar dene.',
+  'This workout is too large for the Coach to read.': 'Bu antrenman Koç’un okuyamayacağı kadar büyük.',
+  'The Coach was switched off for this profile while it was answering.': 'Koç yanıt verirken bu profil için kapatıldı.',
 }

@@ -209,6 +209,13 @@ export const JOB_ERRORS = {
   // The refusal at enqueue when the process cannot drop privileges (api/coach/jobs.js). The same
   // words as api/coach/routes.js USER_ERROR.unprivileged; what to fix goes to the admin card.
   get unprivileged() { return t('The Coach is switched off on this instance for safety reasons.') },
+  // A question asked during a workout is answered in the request that asked it, so what a job
+  // would report through the status poll is that request's own refusal (POST /api/coach/live).
+  get empty() { return t('There’s nothing to answer yet. Type your question first.') },
+  get nolive() { return t('There’s no workout under way to ask about.') },
+  get livecap() { return t('The Coach has answered all it can during workouts today. Try again tomorrow.') },
+  get toolarge() { return t('This workout is too large for the Coach to read.') },
+  get forgotten() { return t('The Coach was switched off for this profile while it was answering.') },
   get internal() { return t('Something went wrong on the server.') }
 }
 

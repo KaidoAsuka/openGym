@@ -2060,4 +2060,15 @@ export default {
   'Take the sets still to do at {0} {1}. This is the demo’s stock answer. With a provider connected, the Coach reads the sets you logged and what you asked.': 'ทำเซ็ตที่เหลือที่ {0} {1} นี่คือคำตอบสำเร็จรูปของเดโม เมื่อเชื่อมต่อผู้ให้บริการแล้ว โค้ชจะอ่านเซ็ตที่คุณบันทึกและสิ่งที่คุณถาม',
   'The demo’s stock suggestion, to show how one is applied.': 'คำแนะนำสำเร็จรูปของเดโม เพื่อให้เห็นว่าการนำไปใช้เป็นอย่างไร',
   'This is the demo’s stock answer. With a provider connected, the Coach reads this workout and answers what you asked.': 'นี่คือคำตอบสำเร็จรูปของเดโม เมื่อเชื่อมต่อผู้ให้บริการแล้ว โค้ชจะอ่านการฝึกครั้งนี้และตอบสิ่งที่คุณถาม',
+  // --- AI Coach: asking before a workout (components/CoachPreSheet.jsx, components/CoachLiveSheet.jsx, lib/coach-demo.js) ---
+  'Ask the Coach before you start': 'ถามโค้ชก่อนเริ่ม',
+  'Say how you are today, how much time you have, or what is in the way. The Coach reads the workout you are about to start.': 'บอกว่าวันนี้คุณเป็นอย่างไร มีเวลาเท่าไร หรือมีอะไรติดขัด โค้ชจะอ่านการฝึกที่คุณกำลังจะเริ่ม',
+  'e.g. “slept five hours and my right shoulder is tight”': 'เช่น “นอนแค่ห้าชั่วโมง และไหล่ขวาตึง”',
+  'Train {0} today instead': 'วันนี้ฝึก {0} แทน',
+  'Rest today': 'วันนี้พัก',
+  'Only today changes. Your plan stays as it is.': 'เปลี่ยนเฉพาะวันนี้ แผนของคุณยังเหมือนเดิม',
+  'In place of {0}, as the Coach suggested before the workout': 'ฝึกแทน {0} ตามที่โค้ชแนะนำก่อนการฝึก',
+  'Suggested by the Coach before the workout': 'โค้ชแนะนำก่อนการฝึก',
+  'Leave {0} out today. This is the demo’s stock answer. With a provider connected, the Coach reads the workout you are about to start and what you told it.': 'วันนี้ข้าม {0} นี่คือคำตอบสำเร็จรูปของเดโม เมื่อเชื่อมต่อผู้ให้บริการแล้ว โค้ชจะอ่านการฝึกที่คุณกำลังจะเริ่มและสิ่งที่คุณบอก',
+  'Train {0} today instead. This is the demo’s stock answer.': 'วันนี้ฝึก {0} แทน นี่คือคำตอบสำเร็จรูปของเดโม',
 }

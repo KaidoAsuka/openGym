@@ -2053,4 +2053,15 @@ export default {
   'Take the sets still to do at {0} {1}. This is the demo’s stock answer. With a provider connected, the Coach reads the sets you logged and what you asked.': 'Оставшиеся подходы сделай с {0} {1}. Это готовый ответ демо-версии. С подключённым провайдером тренер читает записанные подходы и твой вопрос.',
   'The demo’s stock suggestion, to show how one is applied.': 'Готовое предложение демо-версии, чтобы показать, как его применить.',
   'This is the demo’s stock answer. With a provider connected, the Coach reads this workout and answers what you asked.': 'Это готовый ответ демо-версии. С подключённым провайдером тренер читает эту тренировку и отвечает на твой вопрос.',
+  // --- AI Coach: asking before a workout (components/CoachPreSheet.jsx, components/CoachLiveSheet.jsx, lib/coach-demo.js) ---
+  'Ask the Coach before you start': 'Спросить тренера перед началом',
+  'Say how you are today, how much time you have, or what is in the way. The Coach reads the workout you are about to start.': 'Расскажи, как ты сегодня, сколько у тебя времени или что мешает. Тренер читает тренировку, которую ты собираешься начать.',
+  'e.g. “slept five hours and my right shoulder is tight”': 'напр. «спал пять часов, правое плечо зажато»',
+  'Train {0} today instead': 'Сегодня вместо этого: {0}',
+  'Rest today': 'Сегодня отдых',
+  'Only today changes. Your plan stays as it is.': 'Меняется только сегодняшний день. План остаётся как есть.',
+  'In place of {0}, as the Coach suggested before the workout': 'Вместо {0}, как предложил тренер перед тренировкой',
+  'Suggested by the Coach before the workout': 'Предложено тренером перед тренировкой',
+  'Leave {0} out today. This is the demo’s stock answer. With a provider connected, the Coach reads the workout you are about to start and what you told it.': 'Сегодня пропусти {0}. Это готовый ответ демо-версии. С подключённым провайдером тренер читает тренировку, которую ты собираешься начать, и то, что ты ему рассказал.',
+  'Train {0} today instead. This is the demo’s stock answer.': 'Сегодня вместо этого: {0}. Это готовый ответ демо-версии.',
 }

@@ -17,6 +17,7 @@ import { fmtNum, exerciseNameText } from '../lib/format.js'
 import { exOr } from '../lib/exercises.js'
 import { FLAG_LABEL } from '../lib/exercise-flags.js'
 import { canAskLive, talkOf, openTurn, previewOp, opMoves, takeOp, undoMarks, cleanCoached } from '../lib/coach-live.js'
+import { cleanCoachedDay } from '../lib/coach-pre.js'
 import { askCoachLive, isAsking, setLiveSheet, jobErrorText } from '../lib/coach-api.js'
 import Icon from './Icon.jsx'
 import '../coach.css'
@@ -45,12 +46,26 @@ export function opLine(rec, unit) {
   return t('Skip the sets still to do')
 }
 
-/** What the Coach suggested during a workout and they took, in the workout's own detail. */
+/** The day an answer suggested, in words (lib/coach-pre.js). The routine is named as the plan
+ *  names it now, and as the answer named it when the plan no longer holds it. */
+export function dayLine(day, routines) {
+  if (day?.do === 'rest') return t('Rest today')
+  const now = (routines || []).find(r => r && r.id === day?.routine)?.name
+  return t('Train {0} today instead', now || day?.name || '')
+}
+
+/** What the Coach suggested during a workout and they took, in the workout's own detail; and
+ *  before it, when the workout itself was trained that day on its suggestion. */
 export function CoachedLines({ workout, unit }) {
   const taken = cleanCoached(workout?.coached)
-  if (!taken.length) return null
+  const day = workout?.coachedDay ? cleanCoachedDay(workout.coachedDay) : null
+  if (!taken.length && !day) return null
   return <div className="live-taken">
     <div className="live-taken-h"><Icon name="sparkles" />{t('Suggested by the Coach during this workout')}</div>
+    {day && <div className="live-taken-i">
+      <div>{day.from.length ? t('In place of {0}, as the Coach suggested before the workout', day.from.join(' + ')) : t('Suggested by the Coach before the workout')}</div>
+      {day.why && <div className="live-why">{day.why}</div>}
+    </div>}
     {taken.map((c, i) => <div key={i} className="live-taken-i">
       <div><b>{nameOf(c.id)}</b> · {opLine(c, unit)}</div>
       {c.why && <div className="live-why">{c.why}</div>}
@@ -121,7 +136,7 @@ export default function CoachLiveSheet({ focus, close }) {
             <div className="bub err">{jobErrorText(m.error, m.detail)}</div>
             <button className="live-link" onClick={() => askCoachLive({ retry: m.turn })}>{t('Try again')}</button>
           </div>
-          : <Answer key={m.id} line={m} active={A} unit={S.unit} onApply={i => apply(m, i)} onUndoMarks={() => update(s => { undoMarks(s.active, m.id) })} />)}
+          : <Answer key={m.id} line={m} active={A} unit={S.unit} routines={S.routines} onApply={i => apply(m, i)} onUndoMarks={() => update(s => { undoMarks(s.active, m.id) })} />)}
 
       {waiting && <div className="msg coach">
         <div className="bub typing"><i /><i /><i /></div>
@@ -145,11 +160,31 @@ export default function CoachLiveSheet({ focus, close }) {
   </div>
 }
 
-function Answer({ line, active, unit, onApply, onUndoMarks }) {
+/* One answer: what the Coach said, a card for each op, and the marks it set. An answer given
+   before the workout was started may hold a card for the day instead (`line.day`): it can be
+   taken where `onDay` is given, which is the sheet that asks before a workout; in a workout
+   under way it is shown only when it was taken, as what led to this workout. */
+export function Answer({ line, active, unit, routines, onApply, onUndoMarks, onDay, dayFits }) {
   const ops = line.ops || []
   const taken = line.taken || []
-  return <div className="msg coach" style={ops.length ? { maxWidth: '100%', width: '100%' } : undefined}>
+  const day = line.day && (onDay || line.dayTaken) ? line.day : null
+  const dayStale = !!day && !line.dayTaken && !dayFits
+  return <div className="msg coach" style={ops.length || day ? { maxWidth: '100%', width: '100%' } : undefined}>
     {!!line.text && <div className="bub">{line.text}</div>}
+    {day && <div className="pcard live-ops">
+      <div className={'pcard-chg' + (dayStale ? ' stale' : '')}>
+        <div className="grow">
+          <div className="pcard-chg-t">{t('Today')}</div>
+          <div className="pcard-chg-v">{dayLine(day, routines)}</div>
+          {day.why && <div className="pcard-chg-w">{day.why}</div>}
+          {dayStale && <div className="pcard-chg-stale">{t('No longer fits this workout.')}</div>}
+        </div>
+        {line.dayTaken
+          ? <span className="live-done"><Icon name="check" />{t('Applied')}</span>
+          : <button className="btn sm primary live-apply" disabled={dayStale} onClick={onDay}>{t('Apply')}</button>}
+      </div>
+      <div className="live-only">{t('Only today changes. Your plan stays as it is.')}</div>
+    </div>}
     {ops.length > 0 && <div className="pcard live-ops">
       {ops.map((op, i) => {
         const done = taken.includes(i)

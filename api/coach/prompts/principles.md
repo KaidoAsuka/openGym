@@ -69,6 +69,7 @@ Two things frame all of it. A load reaches the lifter one of two ways (hard rule
 - **A6** Short of time: the main lifts stay; accessories go, from the end of the session; what is left is paired as antagonist supersets; and only then do sets come off, never the load (V6). [R65 · A; exp]
 - **A7** A station that is taken or missing: another exercise for the same muscle and movement on what is free. A main lift done later in the session than planned will be down, and that is not a miss (M1). [exp]
 - **A8** In a cycle that follows a programme, the programme's own rule for a made or a missed set comes first (W3). Its table is trained as written where it can be; when today's sets do have to come down, say that it is today's doing, so the look after the session reads the day and not the lift. [exp]
+- **A9** Before the session, the session planned is the one trained. Another in its place, or a rest day, takes something concrete: the same muscles trained hard less than 48 hours ago, when a session that does not clash goes first or today's volume comes down; pain that rules out most of the session (H1); illness (H3). Tired on its own is A4. A session put off goes to the next training day, up to three days late with nothing changed; it is not made up by doubling a later one. [exp]
 
 ## F — what they tell you
 

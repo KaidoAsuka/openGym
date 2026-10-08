@@ -19,7 +19,7 @@ import { glyphStr } from './glyphs.js';
 import { planLoadFindings, findingErrors, advisoriesOf, isHardFinding, changeLoadErrors, customBodyParts } from './plan-load.js';
 import { programCard } from './kb.js';
 import { cleanCyclePlan, cleanChanges, planAt, baseOf, withChanges, CYCLE_WEEKS_MAX, ADJUST_SUMMARY_MAX, ADJUST_NOTES_MAX } from './cycle.js';
-import { cleanOps, LIVE_REPLY_MAX } from './live.js';
+import { cleanOps, cleanDay, LIVE_REPLY_MAX } from './live.js';
 // The marks an exercise can carry — the list the phone's own is pinned to.
 import { FLAG_KINDS } from './payload.js';
 
@@ -774,7 +774,10 @@ export function validateAdjust(data, ctx = {}) {
  *
  * `ctx.live` is payload.js liveContext; `ctx.customIds` and `ctx.names` are the person's own
  * exercises, which a swap may bring in as well as the catalogue's.
- * Returns { ok, proposal:{ reply, ops, flags } } | { ok:false, errors }.
+ *
+ * Asked before the session is started (`ctx.live.pre`), the answer may say one thing about the
+ * day instead of ops: another session of the plan in its place, or none (live.js cleanDay).
+ * Returns { ok, proposal:{ reply, ops, flags, day? } } | { ok:false, errors }.
  */
 export function validateLive(data, ctx = {}) {
   if (!data || typeof data !== 'object') return fail(['the answer was not an object']);
@@ -789,9 +792,11 @@ export function validateLive(data, ctx = {}) {
   const lookup = id => (libraryHas(id) ? { name: libraryName(id), cardio: LIB_BY_ID.get(id).bp === 'cardio' }
     : own.has(id) ? { name: isStr(names[id]) ? clampStr(names[id], 80) : null, cardio: false } : null);
   const read = cleanOps(data, ctx.live, { lookup, flagKinds: FLAG_KINDS });
-  errors.push(...read.errors);
+  // The day itself, which only a session not yet started can be answered about.
+  const on = cleanDay(data, ctx.live);
+  errors.push(...read.errors, ...on.errors);
   if (errors.length) return fail(errors);
-  return { ok: true, proposal: { reply: cutText(data.reply, LIVE_REPLY_MAX), ops: read.ops, flags: read.flags } };
+  return { ok: true, proposal: { reply: cutText(data.reply, LIVE_REPLY_MAX), ops: read.ops, flags: read.flags, ...(on.day ? { day: on.day } : {}) } };
 }
 
 /* =============================== workout debriefs =============================== */

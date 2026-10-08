@@ -2043,4 +2043,15 @@ export default {
   'Take the sets still to do at {0} {1}. This is the demo’s stock answer. With a provider connected, the Coach reads the sets you logged and what you asked.': '剩下各組用 {0} {1} 做。這是示範版的固定回答。連上 AI 服務後，教練會讀你記錄的每一組和你問的話。',
   'The demo’s stock suggestion, to show how one is applied.': '示範版的固定建議，用來展示建議怎麼套用。',
   'This is the demo’s stock answer. With a provider connected, the Coach reads this workout and answers what you asked.': '這是示範版的固定回答。連上 AI 服務後，教練會讀這次訓練並回答你問的話。',
+  // --- AI Coach: asking before a workout (components/CoachPreSheet.jsx, components/CoachLiveSheet.jsx, lib/coach-demo.js) ---
+  'Ask the Coach before you start': '開練前問教練',
+  'Say how you are today, how much time you have, or what is in the way. The Coach reads the workout you are about to start.': '說說你今天的狀態、有多少時間，或是有什麼不方便。教練會讀你馬上要練的這次訓練。',
+  'e.g. “slept five hours and my right shoulder is tight”': '例如「只睡了五小時，右肩有點緊」',
+  'Train {0} today instead': '今天改練 {0}',
+  'Rest today': '今天休息',
+  'Only today changes. Your plan stays as it is.': '只改今天，你的計畫不變。',
+  'In place of {0}, as the Coach suggested before the workout': '依教練開練前的建議，取代 {0}',
+  'Suggested by the Coach before the workout': '教練開練前的建議',
+  'Leave {0} out today. This is the demo’s stock answer. With a provider connected, the Coach reads the workout you are about to start and what you told it.': '今天不練 {0}。這是示範版的固定回答。連上 AI 服務後，教練會讀你馬上要練的這次訓練和你說的話。',
+  'Train {0} today instead. This is the demo’s stock answer.': '今天改練 {0}。這是示範版的固定回答。',
 }

@@ -412,6 +412,7 @@ function skippedPart(w, withNote) {
    frontend/src/lib/coach-live.test.js pins the ceiling to the one the phone keeps. */
 export const COACHED_MAX = 12;
 const COACHED_WHY_CHARS = 200;
+const COACHED_DAY_FROM = 4;
 function coachedPart(w) {
   const numbers = v => {
     const o = {};
@@ -438,7 +439,15 @@ function coachedPart(w) {
     if (why) o.why = why;
     out.push(o);
   }
-  return out.length ? { coached: out } : {};
+  // A session trained in place of the one planned, on a suggestion made before it was started
+  // (live.js cleanDay): the names of what was planned, and the reason given.
+  const d = w.coachedDay && typeof w.coachedDay === 'object' ? w.coachedDay : null;
+  const from = list(d?.from).map(n => text(n, NAME_MAX).trim()).filter(Boolean).slice(0, COACHED_DAY_FROM);
+  const dayWhy = text(d?.why, COACHED_WHY_CHARS).trim();
+  return {
+    ...(out.length ? { coached: out } : {}),
+    ...(d ? { coachedDay: { from, ...(dayWhy ? { why: dayWhy } : {}) } } : {})
+  };
 }
 
 /** One older workout as a summary: what was done, the top set, whether targets were hit. */
@@ -1074,9 +1083,19 @@ export function cycleContext(S, today) {
 
    Each exercise keeps the place it has on the phone (`entry`), because that is where an op is
    applied (core/live.js); one that cannot be read is left out and the others keep their numbers.
-   A session being filed for a past day (`backfill`) is not under way, and nothing is read of it. */
+   A session being filed for a past day (`backfill`) is not under way, and nothing is read of it.
+
+   A session that has not been started is sent the same way, as the phone would build it, with
+   `pre: true` (frontend/src/lib/coach-pre.js). It is read as one only while no set of it is done.
+   What is read with it is what the day itself can be answered from (live.js cleanDay): the
+   routines it was built from, and the routines of the plan that could be trained in its place. */
 export const LIVE_PREVIOUS = 2;
 const LIVE_MINUTES_MAX = 12 * 60;
+// Before a session: what was trained lately, a line an exercise, so that "which session today,
+// or none" is answered from the days behind it and not from the weekday.
+export const PRE_RECENT_DAYS = 14;
+export const PRE_RECENT_SESSIONS = 8;
+const PRE_ROUTINES_MAX = 8;
 
 /** The session as an answer about it is checked against (pipeline.js), or null when what was
  *  sent is not a session under way. */
@@ -1101,20 +1120,30 @@ export function liveContext(S, raw) {
     });
   });
   if (!entries.length) return null;
+  const pre = raw.pre === true && !entries.some(e => e.sets.some(s => s.done));
   return {
     id: ident(raw.id), d: day(raw.d), name: word(raw.name, NAME_MAX),
     startedAt: typeof raw.start === 'number' && Number.isFinite(raw.start) ? raw.start : null,
     cur: Number.isInteger(raw.cur) && entries.some(e => e.entry === raw.cur) ? raw.cur : null,
-    entries
+    entries,
+    ...(pre ? {
+      pre: true,
+      routineIds: list(raw.routineIds).map(ident).filter(v => v != null).slice(0, PRE_ROUTINES_MAX),
+      routines: list(S?.routines)
+        .filter(r => r && typeof r === 'object' && ident(r.id) != null && list(r.ex).some(e => e && typeof e === 'object'))
+        .map(r => ({ id: ident(r.id), name: text(r.name == null ? '' : String(r.name), NAME_MAX) }))
+    } : {})
   };
 }
 
-/** The session as the model reads it: where they are, and each exercise with its sets counted. */
+/** The session as the model reads it: where they are, and each exercise with its sets counted.
+ *  One that has not been started has no clock and no exercise they are on. */
 function liveForPayload(live, focus) {
   const minutes = live.startedAt ? Math.round((Date.now() - live.startedAt) / 60000) : null;
-  const at = Number.isInteger(focus) && live.entries.some(e => e.entry === focus) ? focus : live.cur;
+  const at = live.pre ? null : Number.isInteger(focus) && live.entries.some(e => e.entry === focus) ? focus : live.cur;
   return {
     ...(live.name ? { name: live.name } : {}),
+    ...(live.pre ? { pre: true, routines: live.routineIds } : {}),
     ...(minutes != null && minutes >= 0 && minutes <= LIVE_MINUTES_MAX ? { minutes } : {}),
     ...(at != null ? { at } : {}),
     entries: live.entries.map(e => {
@@ -1253,6 +1282,11 @@ export function build(S, opts = {}) {
     if (facts.length) p.lifts = facts;
     const seen = observations(S, inSession);
     if (seen) p.observations = seen;
+    // Asked before the session: the days behind it, whatever was trained on them.
+    if (live?.pre) {
+      const since = new Date(); since.setDate(since.getDate() - PRE_RECENT_DAYS);
+      p.recent = list(S.workouts).filter(w => w && typeof w === 'object' && day(w.d) && day(w.d) >= iso(since)).slice(-PRE_RECENT_SESSIONS).map(compactWorkout);
+    }
     // Where the plan stands: the week of the cycle and what it is for, and the programme it
     // follows, so a load asked about can be held against that programme's own arithmetic.
     const cyc = cycleState(S, coach, p.plan);

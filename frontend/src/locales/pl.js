@@ -2049,4 +2049,15 @@ export default {
   'Take the sets still to do at {0} {1}. This is the demo’s stock answer. With a provider connected, the Coach reads the sets you logged and what you asked.': 'Pozostałe serie zrób na {0} {1}. To gotowa odpowiedź wersji demo. Po podłączeniu dostawcy Trener czyta zapisane serie i twoje pytanie.',
   'The demo’s stock suggestion, to show how one is applied.': 'Gotowa propozycja wersji demo, żeby pokazać, jak się ją stosuje.',
   'This is the demo’s stock answer. With a provider connected, the Coach reads this workout and answers what you asked.': 'To gotowa odpowiedź wersji demo. Po podłączeniu dostawcy Trener czyta ten trening i odpowiada na twoje pytanie.',
+  // --- AI Coach: asking before a workout (components/CoachPreSheet.jsx, components/CoachLiveSheet.jsx, lib/coach-demo.js) ---
+  'Ask the Coach before you start': 'Zapytaj Trenera przed startem',
+  'Say how you are today, how much time you have, or what is in the way. The Coach reads the workout you are about to start.': 'Powiedz, jak się dziś czujesz, ile masz czasu albo co stoi na przeszkodzie. Trener czyta trening, który zaraz zaczniesz.',
+  'e.g. “slept five hours and my right shoulder is tight”': 'np. „spałem pięć godzin i mam spięty prawy bark”',
+  'Train {0} today instead': 'Dziś zamiast tego {0}',
+  'Rest today': 'Dziś odpoczynek',
+  'Only today changes. Your plan stays as it is.': 'Zmienia się tylko dzisiejszy dzień. Twój plan zostaje bez zmian.',
+  'In place of {0}, as the Coach suggested before the workout': 'Zamiast {0}, jak zaproponował Trener przed treningiem',
+  'Suggested by the Coach before the workout': 'Zaproponowane przez Trenera przed treningiem',
+  'Leave {0} out today. This is the demo’s stock answer. With a provider connected, the Coach reads the workout you are about to start and what you told it.': 'Dziś pomiń {0}. To gotowa odpowiedź wersji demo. Po podłączeniu dostawcy Trener czyta trening, który zaraz zaczniesz, i to, co mu powiedziałeś.',
+  'Train {0} today instead. This is the demo’s stock answer.': 'Dziś zamiast tego {0}. To gotowa odpowiedź wersji demo.',
 }

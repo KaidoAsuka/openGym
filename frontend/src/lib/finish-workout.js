@@ -4,6 +4,7 @@ import { bestWeightForEntry, cleanupSg } from './history.js'
 import { hasCompletedWork, isSideSet } from './workout-model.js'
 import { cleanFlags, settleMarks } from './exercise-flags.js'
 import { cleanCoached } from './coach-live.js'
+import { cleanCoachedDay } from './coach-pre.js'
 
 // planSec is live-session bookkeeping: a hold displaced before it finished puts its plan aside so
 // the row still knows what it is asking for (Workout.startTimed). A finished session keeps only
@@ -116,6 +117,9 @@ export function buildCompletedWorkout(active, { end = Date.now(), prs = [], snap
   // workout, so the look that follows reads a weight that came down as its own advice and not as
   // sets that were missed. What was said (active.coachTalk) stays behind with the session.
   const coached = cleanCoached(active?.coached)
+  // And when the workout itself was the Coach's suggestion for the day, made before it was
+  // started (lib/coach-pre.js): what it was trained in place of.
+  const coachedDay = cleanCoachedDay(active?.coachedDay)
 
   const sessionNote = (active?.note || '').trim()
   const routineIds = [].concat(active?.routineIds ?? (active?.routineId ? [active.routineId] : []))
@@ -140,5 +144,6 @@ export function buildCompletedWorkout(active, { end = Date.now(), prs = [], snap
     ...(sessionNote ? { note: sessionNote } : {}),
     ...(skipped.length ? { skipped } : {}),
     ...(coached.length ? { coached } : {}),
+    ...(coachedDay ? { coachedDay } : {}),
   }
 }

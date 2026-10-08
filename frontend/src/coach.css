@@ -338,6 +338,9 @@
 }
 .live-in textarea:focus{box-shadow:inset 0 0 0 1.5px var(--acc)}
 .live-in textarea::placeholder{color:var(--label-3)}
+/* asked before the workout (components/CoachPreSheet.jsx): the composer, and Start under it */
+.live-pre{flex-direction:column;align-items:stretch}
+.live-row{display:flex;gap:8px;align-items:flex-end}
 .live-link{background:none;color:var(--acc);font-size:13px;padding:6px 8px;align-self:flex-start}
 .live-ops{margin-top:6px}
 .live-ops .pcard-chg:first-child{border-top:none}

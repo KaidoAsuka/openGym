@@ -2049,4 +2049,15 @@ export default {
   'Take the sets still to do at {0} {1}. This is the demo’s stock answer. With a provider connected, the Coach reads the sets you logged and what you asked.': '남은 세트는 {0} {1}로 하세요. 이건 데모의 준비된 답변이에요. 제공자를 연결하면 코치가 기록한 세트와 질문을 읽어요.',
   'The demo’s stock suggestion, to show how one is applied.': '제안을 어떻게 적용하는지 보여 주는 데모의 준비된 제안이에요.',
   'This is the demo’s stock answer. With a provider connected, the Coach reads this workout and answers what you asked.': '이건 데모의 준비된 답변이에요. 제공자를 연결하면 코치가 이 운동을 읽고 질문에 답해요.',
+  // --- AI Coach: asking before a workout (components/CoachPreSheet.jsx, components/CoachLiveSheet.jsx, lib/coach-demo.js) ---
+  'Ask the Coach before you start': '시작 전에 코치에게 묻기',
+  'Say how you are today, how much time you have, or what is in the way. The Coach reads the workout you are about to start.': '오늘 컨디션, 쓸 수 있는 시간, 걸림돌이 되는 것을 말해 주세요. 코치는 곧 시작할 운동을 읽어요.',
+  'e.g. “slept five hours and my right shoulder is tight”': '예: “다섯 시간밖에 못 잤고 오른쪽 어깨가 뻐근해요”',
+  'Train {0} today instead': '오늘은 대신 {0} 하기',
+  'Rest today': '오늘은 휴식',
+  'Only today changes. Your plan stays as it is.': '오늘만 바뀌어요. 계획은 그대로예요.',
+  'In place of {0}, as the Coach suggested before the workout': '운동 전 코치의 제안으로 {0} 대신 진행',
+  'Suggested by the Coach before the workout': '운동 전 코치가 제안함',
+  'Leave {0} out today. This is the demo’s stock answer. With a provider connected, the Coach reads the workout you are about to start and what you told it.': '오늘은 {0}을(를) 빼세요. 이건 데모의 준비된 답변이에요. 제공자를 연결하면 코치가 곧 시작할 운동과 말씀하신 내용을 읽어요.',
+  'Train {0} today instead. This is the demo’s stock answer.': '오늘은 대신 {0}을(를) 하세요. 이건 데모의 준비된 답변이에요.',
 }

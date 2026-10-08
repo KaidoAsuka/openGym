@@ -2102,4 +2102,15 @@ export default {
   'Take the sets still to do at {0} {1}. This is the demo’s stock answer. With a provider connected, the Coach reads the sets you logged and what you asked.': 'نفّذ المجموعات المتبقية بوزن {0} {1}. هذه إجابة جاهزة في النسخة التجريبية. عند ربط مزوّد، يقرأ المدرب المجموعات التي سجّلتها وما سألت عنه.',
   'The demo’s stock suggestion, to show how one is applied.': 'اقتراح جاهز في النسخة التجريبية، لإظهار كيفية تطبيق الاقتراحات.',
   'This is the demo’s stock answer. With a provider connected, the Coach reads this workout and answers what you asked.': 'هذه إجابة جاهزة في النسخة التجريبية. عند ربط مزوّد، يقرأ المدرب هذا التمرين ويجيب عمّا سألت.',
+  // --- AI Coach: asking before a workout (components/CoachPreSheet.jsx, components/CoachLiveSheet.jsx, lib/coach-demo.js) ---
+  'Ask the Coach before you start': 'اسأل المدرب قبل أن تبدأ',
+  'Say how you are today, how much time you have, or what is in the way. The Coach reads the workout you are about to start.': 'قل كيف حالك اليوم، وكم لديك من الوقت، أو ما الذي يعترضك. يقرأ المدرب التمرين الذي توشك أن تبدأه.',
+  'e.g. “slept five hours and my right shoulder is tight”': 'مثلًا: «نمت خمس ساعات وكتفي الأيمن مشدود»',
+  'Train {0} today instead': 'تدرّب على {0} اليوم بدلًا من ذلك',
+  'Rest today': 'استرح اليوم',
+  'Only today changes. Your plan stays as it is.': 'يتغيّر اليوم فقط. خطتك تبقى كما هي.',
+  'In place of {0}, as the Coach suggested before the workout': 'بدلًا من {0}، كما اقترح المدرب قبل التمرين',
+  'Suggested by the Coach before the workout': 'اقترحه المدرب قبل التمرين',
+  'Leave {0} out today. This is the demo’s stock answer. With a provider connected, the Coach reads the workout you are about to start and what you told it.': 'اترك {0} اليوم. هذه إجابة جاهزة في النسخة التجريبية. عند ربط مزوّد، يقرأ المدرب التمرين الذي توشك أن تبدأه وما قلته له.',
+  'Train {0} today instead. This is the demo’s stock answer.': 'تدرّب على {0} اليوم بدلًا من ذلك. هذه إجابة جاهزة في النسخة التجريبية.',
 }

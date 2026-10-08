@@ -2049,4 +2049,15 @@ export default {
   'Take the sets still to do at {0} {1}. This is the demo’s stock answer. With a provider connected, the Coach reads the sets you logged and what you asked.': 'Kalan setleri {0} {1} ile yap. Bu, demonun hazır yanıtı. Bir sağlayıcı bağlandığında Koç kaydettiğin setleri ve sorduğunu okur.',
   'The demo’s stock suggestion, to show how one is applied.': 'Demonun hazır önerisi; bir önerinin nasıl uygulandığını göstermek için.',
   'This is the demo’s stock answer. With a provider connected, the Coach reads this workout and answers what you asked.': 'Bu, demonun hazır yanıtı. Bir sağlayıcı bağlandığında Koç bu antrenmanı okur ve sorduğunu yanıtlar.',
+  // --- AI Coach: asking before a workout (components/CoachPreSheet.jsx, components/CoachLiveSheet.jsx, lib/coach-demo.js) ---
+  'Ask the Coach before you start': 'Başlamadan önce Koça sor',
+  'Say how you are today, how much time you have, or what is in the way. The Coach reads the workout you are about to start.': 'Bugün nasıl olduğunu, ne kadar vaktin olduğunu ya da neyin engel olduğunu söyle. Koç, başlamak üzere olduğun antrenmanı okur.',
+  'e.g. “slept five hours and my right shoulder is tight”': 'ör. “beş saat uyudum, sağ omzum gergin”',
+  'Train {0} today instead': 'Bugün bunun yerine {0}',
+  'Rest today': 'Bugün dinlen',
+  'Only today changes. Your plan stays as it is.': 'Yalnızca bugün değişir. Planın olduğu gibi kalır.',
+  'In place of {0}, as the Coach suggested before the workout': '{0} yerine, Koç’un antrenmandan önceki önerisiyle',
+  'Suggested by the Coach before the workout': 'Antrenmandan önce Koç’un önerisi',
+  'Leave {0} out today. This is the demo’s stock answer. With a provider connected, the Coach reads the workout you are about to start and what you told it.': 'Bugün {0} hareketini çıkar. Bu, demonun hazır yanıtı. Bir sağlayıcı bağlandığında Koç, başlamak üzere olduğun antrenmanı ve ona söylediklerini okur.',
+  'Train {0} today instead. This is the demo’s stock answer.': 'Bugün bunun yerine {0}. Bu, demonun hazır yanıtı.',
 }

@@ -2615,6 +2615,12 @@ paths:
         the person takes it. Ops reach no further than that session — the plan and the cycle
         are not changed from here.
 
+        The same question can be asked before the session is started: the client sends the
+        session it would build on Start with `pre: true`. Every set of it is still to do, the
+        same ops apply, and the answer may instead carry `day`: another routine of the plan in
+        today's place, or a rest day. The client applies that to its own state too, as the
+        per-date override it already has.
+
         Counted against a cap of its own (`livePerProfileDaily`), one question at a time for
         a profile. A request that died on the way back can be sent again with the same
         `turnId` within fifteen minutes and is given the answer already made, without a
@@ -2640,7 +2646,9 @@ paths:
                     `sets[]` (`w`, `r`, `sec`, `min`, `speed`, `rir`, `rpe`, `done`, and
                     `phase` or `warmup`), `flags` and `note`. Anything else is ignored. At most 30
                     exercises of 20 rows each are read. A session being filed for a past day
-                    (`backfill`) is not one under way.
+                    (`backfill`) is not one under way. One that has not been started carries
+                    `pre: true` and `routineIds`, has no `start`, and is read as not started
+                    only while none of its sets is done.
                 focus:
                   type: integer
                   description: The index in `session.entries` of the exercise the question was asked from. Absent, it is `session.cur`.
@@ -3258,6 +3266,18 @@ components:
               entry: { type: integer }
               exId: { type: string }
               flag: { type: string, enum: [pain, discomfort, equipment, time, heavy, light, dislike] }
+        day:
+          type: object
+          description: |
+            Only for a session sent with `pre: true`, and never together with `ops`: the day
+            itself. `train` names another routine of the plan to train today instead (`routine`,
+            with its `name`), `rest` calls today off. Absent when the planned session stands.
+          required: [do, why]
+          properties:
+            do: { type: string, enum: [train, rest] }
+            routine: { type: string }
+            name: { type: string }
+            why: { type: string }
         cap:
           type: object
           description: Questions asked during sessions today, and the limit (0 = none).

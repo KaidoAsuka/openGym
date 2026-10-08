@@ -467,6 +467,29 @@ its way; it is written into the workout when it lands.
   exercise they were done on.
 - **Marks are written at once.** A mark is what you said about the exercise, noted for you; the
   answer shows which it set, with an Undo.
+
+**Before the workout.** The same question can be asked before anything is started: how you
+slept, how long you have, what hurts. "Ask the Coach before you start" is on Home under today's
+row and on the Start screen, when today holds a workout and none is under way
+(`frontend/src/components/CoachPreSheet.jsx`). The app builds the workout Start would build,
+without starting it, and sends that with `pre: true`; it is the same request, the same cap and
+the same five ops, with every set still to do. Beside it the Coach gets what you trained in the
+last two weeks, a line an exercise.
+
+- **Tired is not a reason yet.** The principles say what a feeling before the first set is worth
+  (A4): warm up, do that set, ask again. Time, pain and a station you know is taken are answered
+  at once, with cards.
+- **The day itself.** Only before a workout, an answer may carry `day` instead of ops
+  (`DAY_OPS` in `api/coach/core/live.js`): train another routine of your plan today, or rest. It
+  is a card like any other. Tapping it writes the per-date override the day sheet writes, for
+  today and for no other day, and the sheet goes on about the workout that brings in. A workout
+  trained that way is saved with `coachedDay` (what it stood in for, and why), so the look after
+  it reads the session put off as put off on the Coach's advice.
+- **Start opens what was prepared.** Whatever starts today's workout, the sheet's own button or
+  the usual ones, opens it with the cards you tapped already applied and the conversation on it,
+  so a question between two sets follows on from what was said before. What was prepared is kept
+  on the phone under its own key, outside your synced data, for that day only, and is dropped
+  when the plan under it changes (a cycle that moved into its next week, a routine you edited).
 - **What a finished workout keeps.** The ops you took, as `coached` on the workout: the
   exercise, the op, the numbers before and after, and the reason. They are shown in the
   workout's detail and read back by the Coach (`api/coach/core/payload.js`), so the look that

@@ -2069,4 +2069,15 @@ export default {
   'Take the sets still to do at {0} {1}. This is the demo’s stock answer. With a provider connected, the Coach reads the sets you logged and what you asked.': 'Mach die offenen Sätze mit {0} {1}. Das ist die vorgefertigte Antwort der Demo. Mit einem verbundenen Anbieter liest der Coach deine geloggten Sätze und deine Frage.',
   'The demo’s stock suggestion, to show how one is applied.': 'Der vorgefertigte Vorschlag der Demo, um zu zeigen, wie einer übernommen wird.',
   'This is the demo’s stock answer. With a provider connected, the Coach reads this workout and answers what you asked.': 'Das ist die vorgefertigte Antwort der Demo. Mit einem verbundenen Anbieter liest der Coach dieses Training und beantwortet deine Frage.',
+  // --- AI Coach: asking before a workout (components/CoachPreSheet.jsx, components/CoachLiveSheet.jsx, lib/coach-demo.js) ---
+  'Ask the Coach before you start': 'Vor dem Start den Coach fragen',
+  'Say how you are today, how much time you have, or what is in the way. The Coach reads the workout you are about to start.': 'Sag, wie es dir heute geht, wie viel Zeit du hast oder was im Weg ist. Der Coach liest das Training, das du gleich startest.',
+  'e.g. “slept five hours and my right shoulder is tight”': 'z. B. „fünf Stunden geschlafen und die rechte Schulter ist verspannt“',
+  'Train {0} today instead': 'Heute stattdessen {0} trainieren',
+  'Rest today': 'Heute pausieren',
+  'Only today changes. Your plan stays as it is.': 'Nur der heutige Tag ändert sich. Dein Plan bleibt, wie er ist.',
+  'In place of {0}, as the Coach suggested before the workout': 'Statt {0}, wie vom Coach vor dem Training vorgeschlagen',
+  'Suggested by the Coach before the workout': 'Vom Coach vor dem Training vorgeschlagen',
+  'Leave {0} out today. This is the demo’s stock answer. With a provider connected, the Coach reads the workout you are about to start and what you told it.': 'Lass {0} heute weg. Das ist die vorgefertigte Antwort der Demo. Mit einem verbundenen Anbieter liest der Coach das Training, das du gleich startest, und was du ihm gesagt hast.',
+  'Train {0} today instead. This is the demo’s stock answer.': 'Trainiere heute stattdessen {0}. Das ist die vorgefertigte Antwort der Demo.',
 }

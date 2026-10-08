@@ -2046,4 +2046,15 @@ export default {
   'Take the sets still to do at {0} {1}. This is the demo’s stock answer. With a provider connected, the Coach reads the sets you logged and what you asked.': 'Підходи, що залишилися, зроби з {0} {1}. Це готова відповідь демоверсії. З підключеним провайдером Тренер читає записані підходи і твоє запитання.',
   'The demo’s stock suggestion, to show how one is applied.': 'Готова пропозиція демоверсії, щоб показати, як її застосувати.',
   'This is the demo’s stock answer. With a provider connected, the Coach reads this workout and answers what you asked.': 'Це готова відповідь демоверсії. З підключеним провайдером Тренер читає це тренування і відповідає на твоє запитання.',
+  // --- AI Coach: asking before a workout (components/CoachPreSheet.jsx, components/CoachLiveSheet.jsx, lib/coach-demo.js) ---
+  'Ask the Coach before you start': 'Запитати Тренера перед початком',
+  'Say how you are today, how much time you have, or what is in the way. The Coach reads the workout you are about to start.': 'Розкажи, як ти сьогодні, скільки маєш часу або що заважає. Тренер читає тренування, яке ти збираєшся почати.',
+  'e.g. “slept five hours and my right shoulder is tight”': 'напр. «спав п’ять годин, праве плече затиснуте»',
+  'Train {0} today instead': 'Сьогодні натомість: {0}',
+  'Rest today': 'Сьогодні відпочинок',
+  'Only today changes. Your plan stays as it is.': 'Змінюється лише сьогоднішній день. План залишається як є.',
+  'In place of {0}, as the Coach suggested before the workout': 'Замість {0}, як запропонував Тренер перед тренуванням',
+  'Suggested by the Coach before the workout': 'Запропоновано Тренером перед тренуванням',
+  'Leave {0} out today. This is the demo’s stock answer. With a provider connected, the Coach reads the workout you are about to start and what you told it.': 'Сьогодні пропусти {0}. Це готова відповідь демоверсії. З підключеним провайдером Тренер читає тренування, яке ти збираєшся почати, і те, що ти йому розповів.',
+  'Train {0} today instead. This is the demo’s stock answer.': 'Сьогодні натомість: {0}. Це готова відповідь демоверсії.',
 }

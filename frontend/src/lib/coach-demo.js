@@ -12,11 +12,11 @@
 // Nothing here ships in a self-hosted bundle: every entry point is behind DEMO, which Vite
 // replaces at build time.
 
-import { EXIDX, EXDB } from './exercises.js'
+import { EXIDX, EXDB, exOr } from './exercises.js'
 import { modeOf, workoutVolume } from './history.js'
 import { isWarmupRow } from './workout-model.js'
 import { best1RM } from './onerm.js'
-import { fmtNum } from './format.js'
+import { fmtNum, exerciseNameText } from './format.js'
 import { planHash } from './coach.js'
 import { t } from './i18n.js'
 
@@ -296,6 +296,24 @@ export function demoLive(S, body = {}) {
   const e = entries[at]
   return new Promise((resolve, reject) => setTimeout(() => {
     if (!e) { reject(Object.assign(new Error(t('There’s no workout under way to ask about.')), { status: 400, code: 'nolive' })); return }
+    // Asked before the workout is started: the first answer leaves its last exercise out, and a
+    // second one, when the plan holds another routine, moves the day to it. Both kinds of card
+    // can be seen and tapped that way.
+    if (A.pre) {
+      const answer = { id: 'demo-live-' + Date.now().toString(36), cap: { used: ++liveAsked, limit: 30 }, ops: [], flags: [] }
+      const why = t('The demo’s stock suggestion, to show how one is applied.')
+      const other = (S.routines || []).find(r => r && (r.ex || []).length && !(A.routineIds || []).includes(r.id))
+      const last = entries.length - 1
+      if ((body.thread || []).length && other) resolve({ ...answer, reply: t('Train {0} today instead. This is the demo’s stock answer.', other.name), day: { do: 'train', routine: other.id, name: other.name, why } })
+      else if (last > 0) {
+        resolve({
+          ...answer,
+          reply: t('Leave {0} out today. This is the demo’s stock answer. With a provider connected, the Coach reads the workout you are about to start and what you told it.', exerciseNameText(exOr(entries[last].id))),
+          ops: [{ op: 'skip', entry: last, exId: entries[last].id, why }]
+        })
+      } else resolve({ ...answer, reply: t('This is the demo’s stock answer. With a provider connected, the Coach reads this workout and answers what you asked.') })
+      return
+    }
     const left = (e.sets || []).filter(s => s && !isWarmupRow(s) && !s.done)
     const w = Number(left[0]?.w) || 0
     const step = S.unit === 'lb' ? 5 : 2.5

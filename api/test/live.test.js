@@ -19,7 +19,7 @@ const cfg = await import('../coach/config.js');
 const jobs = await import('../coach/jobs.js');
 const payload = await import('../coach/core/payload.js');
 const { validateLive, CHANGE_TYPES } = await import('../coach/core/validate.js');
-const { cleanOps, liveCounts, LIVE_OPS, LIVE_OPS_MAX, LIVE_FLAGS_MAX, LIVE_REPLY_MAX, LIVE_ENTRIES_MAX, LIVE_ROWS_MAX, LIVE_THREAD_LINES, LIVE_THREAD_CHARS, LIVE_WORK_SETS_MAX } = await import('../coach/core/live.js');
+const { cleanOps, cleanDay, liveCounts, DAY_OPS, LIVE_OPS, LIVE_OPS_MAX, LIVE_FLAGS_MAX, LIVE_REPLY_MAX, LIVE_ENTRIES_MAX, LIVE_ROWS_MAX, LIVE_THREAD_LINES, LIVE_THREAD_CHARS, LIVE_WORK_SETS_MAX } = await import('../coach/core/live.js');
 const { runPipeline } = await import('../coach/core/pipeline.js');
 const { buildPrompt, buildPromptParts } = await import('../coach/core/prompt.js');
 const { PROMPTS } = await import('../coach/core/prompts.js');
@@ -688,6 +688,168 @@ test('the phone and the server keep the same number of them, and the prompts say
   assert.match(PROMPTS.common, /\*\*Taken during the session\.\*\* `coached` on a workout/);
   assert.match(PROMPTS.common, /They are not misses and not a stall/);
   assert.match(PROMPTS.adjust, /what you advised while the session was under way \(`coached`\)/);
+});
+
+/* ---------------- asked before the session ---------------- */
+
+// The session as the phone would build it on Start, sent before it is: no clock, nothing done.
+const before = (over = {}) => {
+  const A = active();
+  delete A.start;
+  A.entries = [A.entries[0], A.entries[1], A.entries[3]].map(e => ({ ...e, sets: e.sets.map(s => ({ ...s, done: false })) }));
+  return { ...A, id: 'pre1', pre: true, ...over };
+};
+const twoDays = (over = {}) => state({
+  routines: [
+    { id: 'r1', name: 'Lower', ex: [{ id: SQUAT, sets: 5, reps: 5, weight: 100, prog: 'off' }, { id: BENCH, sets: 3, reps: 8 }, { id: LUNGE, sets: 2, reps: 16, side: true }] },
+    { id: 'r2', name: 'Light', ex: [{ id: DB_BENCH, sets: 3, reps: 10 }] },
+    { id: 'r3', name: 'Empty', ex: [] }
+  ],
+  ...over
+});
+const dayAnswer = (day, over = {}) => ({ coach_contract: 1, reply: 'Train Light today.', day, ...over });
+
+test('the day has a closed list of its own, and the prompt and the schema name it', () => {
+  assert.deepEqual(DAY_OPS, ['train', 'rest']);
+  assert.deepEqual(DAY_OPS.filter(o => LIVE_OPS.includes(o) || CHANGE_TYPES.includes(o)), []);
+  for (const o of DAY_OPS) assert.ok(PROMPTS.live.includes(`"do": "${o}"`), o);
+  assert.match(PROMPTS.live, /## Asked before the session/);
+  assert.match(PROMPTS.principles, /- \*\*A9\*\* Before the session, the session planned is the one trained/);
+  assert.match(PROMPTS.common, /`live\.pre` is `true`/);
+  assert.deepEqual(SCHEMAS.live.properties.day.required, ['do', 'why']);
+});
+
+test('a session not started is read as one, with what the day can be answered from', () => {
+  const S = twoDays();
+  const live = payload.liveContext(S, before());
+  assert.equal(live.pre, true);
+  assert.equal(live.startedAt, null);
+  assert.deepEqual(live.routineIds, ['r1']);
+  assert.deepEqual(live.routines, [{ id: 'r1', name: 'Lower' }, { id: 'r2', name: 'Light' }], 'a routine with nothing in it cannot be trained');
+  // The phone's word for it is not taken once a set is logged: that session is under way.
+  const begun = before();
+  begun.entries[0].sets[1].done = true;
+  assert.equal('pre' in payload.liveContext(S, begun), false);
+  assert.equal('pre' in payload.liveContext(S, active()), false);
+  assert.equal('pre' in payload.liveContext(S, before({ pre: 'yes' })), false);
+  // Read by name and cut, like everything else of it.
+  const hostile = payload.liveContext(
+    twoDays({ routines: [{ id: 'r1', name: 'N'.repeat(5000), SECRET: 'SECRET-31', ex: [{ id: SQUAT }] }, null, 'r9', { id: { $ne: 1 }, ex: [{}] }] }),
+    before({ routineIds: ['r1', { $ne: 1 }, null, ...Array(50).fill('x')] })
+  );
+  assert.equal(hostile.routines.length, 1);
+  assert.equal(hostile.routines[0].name.length, payload.NAME_MAX);
+  assert.ok(hostile.routineIds.length <= 8 && hostile.routineIds.every(v => typeof v === 'string'));
+  assert.ok(!JSON.stringify(hostile).includes('SECRET'));
+});
+
+test('before the session the model is handed the days behind it, and no clock', () => {
+  const S = twoDays();
+  S.workouts.push({ id: 'w2', d: ago(1), name: 'Lower', start: 1, end: 1 + 55 * 60000, prs: [], entries: [{ id: SQUAT, target: { sets: 5, reps: 5, weight: 100 }, sets: [row(100, 5, true), row(100, 5, true)] }] });
+  const p = payload.build(S, { handle: H, kind: 'live', live: before(), note: 'Slept five hours.', focus: 1 });
+  assert.deepEqual([p.live.pre, p.live.routines], [true, ['r1']]);
+  assert.equal('minutes' in p.live, false);
+  assert.equal('at' in p.live, false, 'they are not on an exercise yet, whatever the phone says');
+  assert.deepEqual(p.live.entries.map(e => [e.entry, e.setsDone, e.setsLeft]), [[0, 0, 5], [1, 0, 3], [2, 0, 2]]);
+  // The last two weeks, oldest first, a line an exercise; the session of twenty days ago is out.
+  assert.deepEqual(p.recent.map(w => [w.d, w.name, w.compact]), [[ago(7), 'Lower', true], [ago(1), 'Lower', true]]);
+  assert.equal(p.recent[1].entries[0].done, '2/2');
+  assert.deepEqual(p.plan.routines.map(r => r.id), ['r1', 'r2', 'r3'], 'the plan it can pick another session from');
+  // A session under way gets none of it.
+  assert.equal('recent' in payload.build(S, { handle: H, kind: 'live', live: active(), note: 'q' }), false);
+  const many = twoDays({ workouts: [...Array(30)].map((_, i) => ({ id: 'm' + i, d: ago(1), name: 'Lower', entries: [] })) });
+  assert.equal(payload.build(many, { handle: H, kind: 'live', live: before(), note: 'q' }).recent.length, payload.PRE_RECENT_SESSIONS);
+});
+
+test('the same ops reach a session not started: every set of it is still to do', () => {
+  const ctx = ctxOf(twoDays(), before());
+  const r = check([op('change-remaining', { weight: 95 }), op('skip', { entry: 2, exId: LUNGE }), op('remove-set', { entry: 1, exId: BENCH })], ctx);
+  assert.equal(r.ok, true, JSON.stringify(r.errors));
+  assert.deepEqual(r.proposal.ops.map(o => o.op), ['change-remaining', 'skip', 'remove-set']);
+  assert.equal('day' in r.proposal, false);
+});
+
+test('the day: another session of the plan in its place, or none', () => {
+  const ctx = ctxOf(twoDays(), before());
+  const train = validateLive(dayAnswer({ do: 'train', routine: 'r2', why: ' Lower was trained yesterday (A9). ', SECRET: 'x' }), ctx);
+  assert.deepEqual(train.proposal, { reply: 'Train Light today.', ops: [], flags: [], day: { do: 'train', routine: 'r2', name: 'Light', why: 'Lower was trained yesterday (A9).' } });
+  const rest = validateLive(dayAnswer({ do: 'rest', routine: 'r2', why: 'A fever (H3).' }), ctx);
+  assert.deepEqual(rest.proposal.day, { do: 'rest', why: 'A fever (H3).' }, 'a rest names no routine');
+  assert.ok(validateLive(dayAnswer({ do: 'rest', why: 'x'.repeat(900) }), ctx).proposal.day.why.length <= 300);
+  // A mark for what they said can go with it; it is set on the session they were shown.
+  assert.equal(validateLive(dayAnswer({ do: 'rest', why: 'w' }, { flags: [{ entry: 0, exId: SQUAT, flag: 'pain' }] }), ctx).proposal.flags.length, 1);
+
+  const no = (day, re, c = ctx, over) => { const r = validateLive(dayAnswer(day, over), c); assert.equal(r.ok, false, JSON.stringify(r)); assert.match(r.errors.join('\n'), re); };
+  no('rest', /^day must be an object/);
+  no({ do: 'move-to-friday', why: 'w' }, /day\.do "move-to-friday" is not allowed — use one of: train, rest/);
+  no({ do: 'rest' }, /day\.why is required/);
+  no({ do: 'train', routine: 'r9', why: 'w' }, /day\.routine "r9" is not a routine of plan\.routines that holds an exercise — the plan holds: "r1", "r2"/);
+  no({ do: 'train', routine: 'r3', why: 'w' }, /is not a routine of plan\.routines that holds an exercise/);
+  no({ do: 'train', why: 'w' }, /day\.routine "undefined" is not a routine/);
+  no({ do: 'train', routine: 'r1', why: 'w' }, /is the session they are about to start/);
+  no({ do: 'train', routine: 'r2', why: 'w' }, /an answer with "day" carries no ops/, ctx, { ops: [op('skip')] });
+  // Once a set is done the day is no longer a question, whatever the phone called the session.
+  no({ do: 'rest', why: 'w' }, /day is for a session that has not been started/, ctxOf(twoDays(), active()));
+  // A combined day gives way to any one of its routines: that is a different session.
+  const both = ctxOf(twoDays(), before({ routineIds: ['r1', 'r2'] }));
+  assert.equal(validateLive(dayAnswer({ do: 'train', routine: 'r1', why: 'w' }), both).ok, true);
+});
+
+test('cleanDay stands alone, for the phone that applies what it checked', () => {
+  const live = { pre: true, routineIds: ['a'], routines: [{ id: 'a', name: 'A' }, { id: 'b', name: '' }] };
+  assert.deepEqual(cleanDay({ day: { do: 'train', routine: 'b', why: 'w' } }, live), { day: { do: 'train', routine: 'b', why: 'w' }, errors: [] });
+  assert.deepEqual(cleanDay({}, live), { day: null, errors: [] });
+  assert.deepEqual(cleanDay(null, null), { day: null, errors: [] });
+  assert.equal(cleanDay({ day: { do: 'rest', why: 'w' } }, { ...live, pre: false }).errors.length, 1);
+});
+
+test('the fixture answers about the day when it is asked to, and about the session otherwise', () => {
+  const S = twoDays();
+  const cli = fileURLToPath(new URL('../coach/fixture-cli.mjs', import.meta.url));
+  const run = note => {
+    const p = payload.build(S, { handle: H, kind: 'live', live: before(), note });
+    const out = spawnSync(process.execPath, [cli], { input: buildPrompt('live', p, null), encoding: 'utf8', env: { ...process.env, FIXTURE_MODE: '' } });
+    assert.equal(out.status, 0, out.stderr);
+    const r = validateLive(JSON.parse(out.stdout), ctxOf(S, before()));
+    assert.equal(r.ok, true, JSON.stringify(r.errors));
+    return r.proposal;
+  };
+  assert.deepEqual(run('Should I rest?').day, { do: 'rest', why: 'The fixture rests when it is asked to.' });
+  const other = run('Another session, maybe?');
+  assert.deepEqual([other.day.routine, other.ops.length], ['r2', 0]);
+  const plain = run('Forty minutes today.');
+  assert.equal('day' in plain, false);
+  assert.deepEqual(plain.ops.map(o => [o.op, o.entry]), [['remove-set', 0]]);
+});
+
+test('asked before the session, the lane answers as it does during one, and the day comes back with it', async () => {
+  const p = await provider(q => (q.live?.pre ? dayAnswer({ do: 'train', routine: 'r2', why: 'Lower was trained yesterday.' }) : dayAnswer({ do: 'rest', why: 'w' })));
+  try {
+    const uid = 'u-pre';
+    writeState(tempDir(), uid, twoDays());
+    const r = await ask(uid, { text: 'Which one today?', live: before(), turnId: 'p1' });
+    assert.deepEqual(r.day, { do: 'train', routine: 'r2', name: 'Light', why: 'Lower was trained yesterday.' });
+    assert.deepEqual([r.ops, r.flags], [[], []]);
+    assert.deepEqual(r.cap, { used: 1, limit: 30 }, 'counted with the questions asked during sessions');
+    assert.equal(p.seen[0].live.pre, true);
+    assert.ok(Array.isArray(p.seen[0].recent));
+    // A session under way cannot be answered with a day: tried again, then given up on.
+    assert.equal(await code(ask(uid, { live: active() })), 'unusable');
+    assert.equal(p.seen.length, 3);
+  } finally { p.close(); }
+});
+
+test('a session trained on a suggestion made before it is read back as that', () => {
+  const S = state();
+  const w = S.workouts.at(-1);
+  w.coachedDay = { from: [' Heavy ', 7, 'x'.repeat(500), '', 'B', 'C', 'D', 'E'], why: ' Heavy was trained yesterday. ' + 'y'.repeat(900), SECRET: 'SECRET-41', to: { $ne: 1 } };
+  const read = payload.build(S, { handle: H, kind: 'review' }).window.workouts.find(x => x.coachedDay);
+  assert.deepEqual(read.coachedDay.from, ['Heavy', 'x'.repeat(payload.NAME_MAX), 'B', 'C']);
+  assert.ok(read.coachedDay.why.startsWith('Heavy was trained yesterday.') && read.coachedDay.why.length <= 200);
+  assert.ok(!JSON.stringify(read).includes('SECRET'));
+  S.workouts.at(-1).coachedDay = 'yes';
+  assert.ok(payload.build(S, { handle: H, kind: 'review' }).window.workouts.every(x => !('coachedDay' in x)));
+  assert.match(PROMPTS.common, /`coachedDay` on a workout means the session itself was your suggestion/);
 });
 
 function tempDir() { return process.env.DATA_DIR; }

@@ -2049,4 +2049,15 @@ export default {
   'Take the sets still to do at {0} {1}. This is the demo’s stock answer. With a provider connected, the Coach reads the sets you logged and what you asked.': 'बचे हुए सेट {0} {1} पर करें। यह डेमो का तैयार जवाब है। प्रोवाइडर जुड़ने पर कोच आपके दर्ज किए सेट और आपका सवाल पढ़ता है।',
   'The demo’s stock suggestion, to show how one is applied.': 'डेमो का तैयार सुझाव, यह दिखाने के लिए कि सुझाव कैसे लागू होता है।',
   'This is the demo’s stock answer. With a provider connected, the Coach reads this workout and answers what you asked.': 'यह डेमो का तैयार जवाब है। प्रोवाइडर जुड़ने पर कोच इस वर्कआउट को पढ़कर आपके सवाल का जवाब देता है।',
+  // --- AI Coach: asking before a workout (components/CoachPreSheet.jsx, components/CoachLiveSheet.jsx, lib/coach-demo.js) ---
+  'Ask the Coach before you start': 'शुरू करने से पहले कोच से पूछें',
+  'Say how you are today, how much time you have, or what is in the way. The Coach reads the workout you are about to start.': 'बताएँ कि आज आप कैसा महसूस कर रहे हैं, कितना समय है, या क्या रुकावट है। कोच वह वर्कआउट पढ़ता है जो आप शुरू करने वाले हैं।',
+  'e.g. “slept five hours and my right shoulder is tight”': 'जैसे “पाँच घंटे सोया और दायाँ कंधा जकड़ा हुआ है”',
+  'Train {0} today instead': 'आज इसकी जगह {0} करें',
+  'Rest today': 'आज आराम करें',
+  'Only today changes. Your plan stays as it is.': 'केवल आज का दिन बदलता है। आपका प्लान जैसा है वैसा ही रहता है।',
+  'In place of {0}, as the Coach suggested before the workout': '{0} की जगह, जैसा कोच ने वर्कआउट से पहले सुझाया',
+  'Suggested by the Coach before the workout': 'वर्कआउट से पहले कोच का सुझाव',
+  'Leave {0} out today. This is the demo’s stock answer. With a provider connected, the Coach reads the workout you are about to start and what you told it.': 'आज {0} छोड़ दें। यह डेमो का तैयार जवाब है। प्रोवाइडर जुड़ने पर कोच वह वर्कआउट पढ़ता है जो आप शुरू करने वाले हैं, और जो आपने बताया।',
+  'Train {0} today instead. This is the demo’s stock answer.': 'आज इसकी जगह {0} करें। यह डेमो का तैयार जवाब है।',
 }

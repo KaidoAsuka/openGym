@@ -2052,4 +2052,15 @@ export default {
   'Take the sets still to do at {0} {1}. This is the demo’s stock answer. With a provider connected, the Coach reads the sets you logged and what you asked.': 'A hátralévő sorozatokat {0} {1} súllyal végezd. Ez a demó előre megírt válasza. Csatlakoztatott szolgáltatóval az Edző elolvassa a rögzített sorozataidat és a kérdésedet.',
   'The demo’s stock suggestion, to show how one is applied.': 'A demó előre megírt javaslata, hogy lásd, hogyan lehet egyet alkalmazni.',
   'This is the demo’s stock answer. With a provider connected, the Coach reads this workout and answers what you asked.': 'Ez a demó előre megírt válasza. Csatlakoztatott szolgáltatóval az Edző elolvassa ezt az edzést, és válaszol a kérdésedre.',
+  // --- AI Coach: asking before a workout (components/CoachPreSheet.jsx, components/CoachLiveSheet.jsx, lib/coach-demo.js) ---
+  'Ask the Coach before you start': 'Kérdezd az Edzőt kezdés előtt',
+  'Say how you are today, how much time you have, or what is in the way. The Coach reads the workout you are about to start.': 'Mondd el, hogy vagy ma, mennyi időd van, vagy mi van útban. Az Edző elolvassa az edzést, amelyet kezdeni készülsz.',
+  'e.g. “slept five hours and my right shoulder is tight”': 'pl. „öt órát aludtam, és feszes a jobb vállam”',
+  'Train {0} today instead': 'Ma inkább ez: {0}',
+  'Rest today': 'Ma pihenő',
+  'Only today changes. Your plan stays as it is.': 'Csak a mai nap változik. A terved marad, ahogy van.',
+  'In place of {0}, as the Coach suggested before the workout': '{0} helyett, ahogy az Edző javasolta edzés előtt',
+  'Suggested by the Coach before the workout': 'Az Edző javaslata edzés előtt',
+  'Leave {0} out today. This is the demo’s stock answer. With a provider connected, the Coach reads the workout you are about to start and what you told it.': 'Ma hagyd ki ezt: {0}. Ez a demó előre megírt válasza. Csatlakoztatott szolgáltatóval az Edző elolvassa az edzést, amelyet kezdeni készülsz, és azt is, amit elmondtál neki.',
+  'Train {0} today instead. This is the demo’s stock answer.': 'Ma inkább ez: {0}. Ez a demó előre megírt válasza.',
 }

@@ -16,6 +16,7 @@ import { freshDigests, adoptDigests } from './coach-digests.js'
 import { freshLooks, applyLooks } from './coach-cycle.js'
 import { appendChat } from './coach.js'
 import { canAskLive, newTurnId, addQuestion, addAnswer, addFailure, talkOf, threadFor } from './coach-live.js'
+import { useCoachPre, currentPre } from '../store/useCoachPre.js'
 
 const POLL_MS = 3000       // a job is running: often enough to feel live
 const IDLE_MS = 60000       // a Coach screen is open but nothing is running
@@ -143,14 +144,31 @@ export const isAsking = turn => asking.has(turn)
 // was closed is announced, with a way to it.
 let liveSheet = { open: () => false, show: null }
 export function setLiveSheet(hooks) { liveSheet = { ...liveSheet, ...hooks } }
+let preSheet = { open: () => false, show: null }
+export function setPreSheet(hooks) { preSheet = { ...preSheet, ...hooks } }
+
+/* Where a question is asked. During a workout it is `S.active`. Before one it is the workout
+   Start would build, prepared and held aside until then (lib/coach-pre.js, store/useCoachPre.js);
+   the request, the retries and what is written back are the same, so the two differ only in
+   where the workout is read from and written to. */
+const DURING = {
+  session: () => S().active,
+  change: fn => useStore.getState().update(s => { if (s.active) fn(s.active) }),
+  sheet: () => liveSheet,
+}
+const BEFORE = {
+  session: () => currentPre()?.session || null,
+  change: fn => useCoachPre.getState().change(p => fn(p.session)),
+  sheet: () => preSheet,
+}
 
 const _askLive = async body => DEMO ? (await demo()).demoLive(S(), body) : LOCAL() ? (await local()).localLive(S(), body) : api('/api/coach/live', { method: 'POST', timeout: LIVE_REQUEST_MS, body: JSON.stringify({ ...body, lang: getLang() }) })
 const classOf = e => e?.data?.code || e?.code || null
 
-async function sendLive(turn, line) {
+async function sendLive(turn, line, where) {
   const began = Date.now()
   for (let i = 0; ; i++) {
-    const A = S().active
+    const A = where.session()
     if (!canAskLive(A)) throw Object.assign(new Error('no workout under way'), { status: 400, code: 'nolive' })
     // What was said stays here: the thread goes along cut to what the server reads of it.
     const { coachTalk, ...session } = A
@@ -172,31 +190,38 @@ async function sendLive(turn, line) {
  * written into the workout first and the answer, or the reason there is none, when it comes;
  * nothing is returned that the store does not hold.
  */
-export async function askCoachLive({ text, focus, retry } = {}) {
+export const askCoachLive = args => ask(args, DURING)
+
+/** The same, asked before the workout is started, about the one prepared for today. */
+export const askCoachPre = args => ask(args, BEFORE)
+
+async function ask({ text, focus, retry } = {}, where) {
   const store = useStore.getState()
-  const active = store.S.active
+  const active = where.session()
   if (!store.ready || !canAskLive(active)) return false
   const workout = active.id
   const turn = retry || newTurnId()
   if (asking.has(turn)) return false
   asking.add(turn)
   try {
-    if (!retry) store.update(s => { addQuestion(s.active, { id: turn, text, focus }) })
+    if (!retry) where.change(a => { addQuestion(a, { id: turn, text, focus }) })
     // Asking again takes the old reason away, so the sheet shows the wait and not the failure.
-    else store.update(s => { if (s.active) s.active.coachTalk = talkOf(s.active).filter(m => !(m && m.turn === turn && m.error)) })
-    const line = talkOf(useStore.getState().S.active).find(m => m && m.who === 'user' && m.id === turn)
+    else where.change(a => { a.coachTalk = talkOf(a).filter(m => !(m && m.turn === turn && m.error)) })
+    const line = talkOf(where.session()).find(m => m && m.who === 'user' && m.id === turn)
     if (!line) return false
     let answer = null, failure = null
-    try { answer = await sendLive(turn, line) } catch (e) { failure = e }
+    try { answer = await sendLive(turn, line, where) } catch (e) { failure = e }
     asking.delete(turn)
-    // Written only into the workout it was asked in: one finished or discarded meanwhile is gone.
-    useStore.getState().update(s => {
-      if (!s.active || s.active.id !== workout) return
-      if (answer) addAnswer(s.active, turn, answer)
-      else addFailure(s.active, turn, classOf(failure) || (failure?.status ? 'internal' : 'lost'), LOCAL() ? (failure?.data?.detail || failure?.detail) : null)
+    // Written only into the workout it was asked in: one finished or discarded meanwhile is gone,
+    // and so is one prepared for a day that was since given another session.
+    where.change(a => {
+      if (a.id !== workout) return
+      if (answer) addAnswer(a, turn, answer)
+      else addFailure(a, turn, classOf(failure) || (failure?.status ? 'internal' : 'lost'), LOCAL() ? (failure?.data?.detail || failure?.detail) : null)
     })
-    if (answer && !liveSheet.open() && useStore.getState().S.active?.id === workout) {
-      useUI.getState().toast(t('The Coach answered.'), liveSheet.show ? { action: t('Show'), onAction: () => liveSheet.show() } : undefined)
+    const sheet = where.sheet()
+    if (answer && !sheet.open() && where.session()?.id === workout) {
+      useUI.getState().toast(t('The Coach answered.'), sheet.show ? { action: t('Show'), onAction: () => sheet.show() } : undefined)
     }
     return !!answer
   } finally {

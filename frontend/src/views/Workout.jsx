@@ -45,6 +45,7 @@ import { FlagTags } from '../components/ExerciseFlags.jsx'
 import { DEMO } from '../lib/demo.js'
 import { MOBILE } from '../lib/mobile.js'
 import { openCoachLive } from '../components/CoachLiveSheet.jsx'
+import { AskBefore } from '../components/CoachPreSheet.jsx'
 import { canAskLive } from '../lib/coach-live.js'
 import { coachAvailable, hasConsent } from '../lib/coach.js'
 
@@ -72,6 +73,7 @@ function StartChooser() {
         <span className="lrow-i" style={{ width: 38, height: 38, borderRadius: 9, fontSize: 22 }}><Icon name={glyphOf(todayRoutines[0].emoji)} /></span>
       </div>
       <Button variant="primary" icon="play" onClick={() => startFlow(todayIds)}>{t('Start {0}', todayName)}</Button>
+      <AskBefore />
     </div>}
     {others.length > 0 && <><h4 className="sec">{t('Other routines')}</h4>
       <div className="list">{others.map(r => <div key={r.id} className="item" onClick={() => startFlow([r.id])}>

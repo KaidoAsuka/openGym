@@ -7,7 +7,8 @@
 //
 // Three things are kept, all on `S.active`, which never leaves the phone:
 //   active.coachTalk  what was said in this workout, theirs and the Coach's, with each answer's
-//                     ops and the marks it set
+//                     ops and the marks it set. It begins before the workout does when the
+//                     Coach was asked first (lib/coach-pre.js)
 //   active.coached    what was taken of those ops. Saved with the finished workout
 //                     (finish-workout.js), so the look that follows reads a weight the Coach
 //                     lowered as its own suggestion and not as a set that was missed
@@ -17,7 +18,7 @@
 // is tapped (cleanOps), against the workout as it is by then. In between the person may have
 // swapped the exercise, done the sets, or changed the numbers themselves; an op that no longer
 // fits is not applied.
-import { LIVE_OPS, LIVE_THREAD_LINES, LIVE_THREAD_CHARS, cleanOps } from '../../../api/coach/core/live.js'
+import { LIVE_OPS, DAY_OPS, LIVE_THREAD_LINES, LIVE_THREAD_CHARS, LIVE_WHY_MAX, cleanOps } from '../../../api/coach/core/live.js'
 import { modeOf, isPerSide, buildSets, applyIntensifierPlan, cleanupSg, setSpanAt, defaultConfig } from './history.js'
 import { isWarmupRow, isSideSet, makeSideSet, syncSideAggregate, hasCompletedWork, WEIGHT_ORIGIN_MANUAL } from './workout-model.js'
 import { buildPlannedEntry, builtOutOfProgression } from './session-start.js'
@@ -417,14 +418,30 @@ export function addAnswer(active, turn, answer, at = Date.now()) {
   }
   // A failure written for this turn earlier (the first try timed out) gives way to the answer.
   active.coachTalk = talkOf(active).filter(m => !(m && m.turn === turn && m.error))
+  const day = dayOfAnswer(active, answer)
   const line = {
     id: turn + '.a', turn, who: 'coach', at,
     text: typeof answer?.reply === 'string' ? answer.reply.trim().slice(0, REPLY_CHARS) : '',
     ...(ops.length ? { ops } : {}),
     ...(marks.length ? { marks } : {}),
+    ...(day ? { day } : {}),
   }
   keep(active, line)
   return line
+}
+
+/** What an answer says about the day itself, as its line keeps it: only for a workout that has
+ *  not been started (lib/coach-pre.js), and read by name. It waits to be tapped, like an op. */
+function dayOfAnswer(active, answer) {
+  const d = answer?.day
+  if (!active?.pre || !d || typeof d !== 'object' || !DAY_OPS.includes(d.do)) return null
+  const why = typeof d.why === 'string' ? d.why.trim().slice(0, LIVE_WHY_MAX) : ''
+  if (d.do === 'train' && d.routine == null) return null
+  return {
+    do: d.do,
+    ...(d.do === 'train' ? { routine: d.routine, ...(typeof d.name === 'string' && d.name ? { name: d.name.slice(0, 80) } : {}) } : {}),
+    ...(why ? { why } : {}),
+  }
 }
 
 /** The question could not be answered: the class it failed with, in place of an answer. One line

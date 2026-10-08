@@ -197,7 +197,9 @@ export const LIVE_SCHEMA = {
       type: 'array',
       maxItems: 3,
       items: { type: 'object', properties: { entry: { type: 'integer' }, exId: STR, flag: STR }, required: ['entry', 'exId', 'flag'] }
-    }
+    },
+    // Before the session only: another session of the plan in its place, or none (live.js DAY_OPS).
+    day: { type: 'object', properties: { do: STR, routine: STR, why: STR }, required: ['do', 'why'] }
   },
   required: ['coach_contract', 'reply']
 };

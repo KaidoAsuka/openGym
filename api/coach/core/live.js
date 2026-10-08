@@ -19,10 +19,19 @@
  * Only cycle.js is imported, for the ranges a number is held to. Both runtimes use this file —
  * the server to check an answer, the phone to apply one — and the phone's main bundle must not
  * pull the catalogue in behind it. Whether an exercise exists is asked through `lookup`.
+ *
+ * The same question can be asked before the session is started: how they slept, how long they
+ * have, what hurts. The session is then the one the phone would build if they tapped Start (it is
+ * sent with `pre: true`), every set of it is still to do, and the same ops apply to it. One thing
+ * more can be said then and only then, about the day itself (`day`, DAY_OPS): train another
+ * session of the plan in its place, or none. That too is a card they tap, and what the phone
+ * writes is the per-date override the app already has, for today and for no other day.
  */
 import { readNumbers } from './cycle.js';
 
 export const LIVE_OPS = ['change-remaining', 'remove-set', 'add-set', 'swap', 'skip'];
+// What an answer may say about the day, before the session is started.
+export const DAY_OPS = ['train', 'rest'];
 // What the phone may send of a session, and what an answer may hold.
 export const LIVE_ENTRIES_MAX = 30;
 export const LIVE_ROWS_MAX = 20;          // rows of one exercise, warm-ups included
@@ -160,4 +169,47 @@ export function cleanOps(data, live, { lookup = () => null, flagKinds = [] } = {
   });
 
   return { ops, flags, errors };
+}
+
+/**
+ * An answer's word on the day itself, checked against the session it is for.
+ *
+ * @param {object} data  the model's answer: `{ day?: { do, routine?, why }, ops? }`
+ * @param {object} live  `{ pre, routineIds, routines: [{ id, name }] }`: whether the session is
+ *                       still to be started, the routines it was built from, and the routines of
+ *                       the plan that can be trained (payload.js liveContext; the phone's own
+ *                       reading is coach-pre.js dayView)
+ * @returns {{ day: { do, routine?, name?, why } | null, errors: string[] }}
+ */
+export function cleanDay(data, live) {
+  const errors = [];
+  const c = data?.day;
+  if (c == null) return { day: null, errors };
+  if (typeof c !== 'object' || Array.isArray(c)) { errors.push('day must be an object — leave it out when the planned session stands'); return { day: null, errors }; }
+  if (!live?.pre) {
+    errors.push('day is for a session that has not been started, and this one is under way — what is left of it is "skip", and what to do tomorrow is said in "reply"');
+    return { day: null, errors };
+  }
+  if (!DAY_OPS.includes(c.do)) { errors.push(`day.do "${c.do}" is not allowed — use one of: ${DAY_OPS.join(', ')}`); return { day: null, errors }; }
+  if (!isStr(c.why)) { errors.push('day.why is required — say what in their log, or which rule, it rests on'); return { day: null, errors }; }
+  // Ops are for the session in front of them, and `day` puts another in its place or none.
+  if (list(data.ops).length) {
+    errors.push('an answer with "day" carries no ops: they would be for the session that "day" replaces or calls off. Give one or the other — once they take "day" they can ask again about the session it brings in');
+    return { day: null, errors };
+  }
+  const out = { do: c.do };
+  if (c.do === 'train') {
+    const routines = list(live.routines);
+    const to = routines.find(r => same(r.id, c.routine));
+    if (!to) {
+      errors.push(`day.routine "${c.routine}" is not a routine of plan.routines that holds an exercise — the plan holds: ${routines.map(r => `"${r.id}"`).join(', ') || '(none)'}`);
+      return { day: null, errors };
+    }
+    if (list(live.routineIds).length === 1 && same(live.routineIds[0], to.id)) {
+      errors.push(`day.routine "${c.routine}" is the session they are about to start — leave "day" out when the planned session stands`);
+      return { day: null, errors };
+    }
+    Object.assign(out, { routine: to.id }, isStr(to.name) ? { name: to.name } : {});
+  }
+  return { day: { ...out, why: c.why.trim().slice(0, LIVE_WHY_MAX) }, errors };
 }

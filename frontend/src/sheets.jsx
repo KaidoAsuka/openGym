@@ -59,6 +59,8 @@ import { queueRemaining, pinState } from './lib/queue.js'
 import { cleanFlags, setEntryFlags } from './lib/exercise-flags.js'
 import { FlagPicker, FlagTags } from './components/ExerciseFlags.jsx'
 import { CoachedLines } from './components/CoachLiveSheet.jsx'
+import { takePre } from './store/useCoachPre.js'
+import { startFromPre } from './lib/coach-pre.js'
 
 const S = () => useStore.getState().S
 const update = (...a) => useStore.getState().update(...a)
@@ -2390,6 +2392,8 @@ export function startFlow(routineIds) {
 export function beginWorkout(routineIds, bw) {
   const st = S()
   const { entries, routineIds: rids, routines } = buildCombinedEntries(st, routineIds)
+  // What was asked of the Coach before this workout, and taken (lib/coach-pre.js).
+  const pre = takePre(st, rids)
   update(s => {
     s.active = {
       id: uid(), d: todayISO(), start: Date.now(),
@@ -2402,6 +2406,7 @@ export function beginWorkout(routineIds, bw) {
       // changing the saved default (Settings → Workout view) mid-session leaves it alone.
       workoutView: st.workoutView || 'cards',
     }
+    startFromPre(s.active, pre)
   })
   useUI.getState().stopRest()
   navToWorkout()

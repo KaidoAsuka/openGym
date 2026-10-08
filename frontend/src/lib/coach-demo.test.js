@@ -416,6 +416,7 @@ describe('coach-demo — a question during a workout', () => {
   beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(NOW) })
   afterEach(() => { vi.useRealTimers() })
   const ask = async body => { const p = demoLive({ unit: 'kg' }, body); await vi.advanceTimersByTimeAsync(1500); return p }
+  const demoLiveAfter = async (S, body) => { const p = demoLive(S, body); await vi.advanceTimersByTimeAsync(1500); return p }
 
   it('answers in the shape a real answer has, with an op this workout can take', async () => {
     const A = active()
@@ -444,5 +445,30 @@ describe('coach-demo — a question during a workout', () => {
     const failed = expect(p).rejects.toMatchObject({ code: 'nolive' })
     await vi.advanceTimersByTimeAsync(1500)
     await failed
+  })
+
+  // Asked before the workout is started (lib/coach-pre.js): nothing is done yet, so the stock
+  // answer leaves the last exercise out; asked again, it moves the day to another routine, so
+  // both kinds of card can be seen in the demo.
+  it('before a workout, answers with a card for the workout and then with one for the day', async () => {
+    const pre = () => ({ ...active(), pre: true, routineIds: ['a'], start: undefined, entries: active().entries.map(e => ({ ...e, sets: e.sets.map(s => ({ ...s, done: false })) })) })
+    const S = { unit: 'kg', routines: [{ id: 'a', name: 'A', ex: [{ id: SQUAT }] }, { id: 'b', name: 'B', ex: [{ id: ROW }] }, { id: 'c', name: 'C', ex: [] }] }
+    const askPre = async body => { const p = demoLive(S, body); await vi.advanceTimersByTimeAsync(1500); return p }
+    const A = pre()
+    const first = await askPre({ text: 'tired', session: A, thread: [] })
+    expect(first.ops).toEqual([{ op: 'skip', entry: 2, exId: PLANK, why: expect.any(String) }])
+    expect('day' in first).toBe(false)
+    addQuestion(A, { id: 'q1', text: 'tired' })
+    expect(addAnswer(A, 'q1', first)).toBeTruthy()
+    expect(fitOp(A, first.ops[0])).toMatchObject({ op: 'skip', entry: 2 })
+
+    const second = await askPre({ text: 'and now?', session: A, thread: [{ who: 'user', text: 'tired' }, { who: 'coach', text: first.reply }] })
+    expect(second.ops).toEqual([])
+    expect(second.day).toEqual({ do: 'train', routine: 'b', name: 'B', why: expect.any(String) })
+    addQuestion(A, { id: 'q2', text: 'and now?' })
+    expect(addAnswer(A, 'q2', second).day).toMatchObject({ do: 'train', routine: 'b' })
+    // With no other routine to go to, it stays with the workout.
+    const alone = await demoLiveAfter({ ...S, routines: S.routines.slice(0, 1) }, { text: 'again', session: A, thread: [{ who: 'user', text: 'tired' }] })
+    expect('day' in alone).toBe(false)
   })
 })

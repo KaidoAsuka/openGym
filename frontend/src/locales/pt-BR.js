@@ -1311,6 +1311,17 @@ export const PT_BR_OVERRIDES = {
   'Take the sets still to do at {0} {1}. This is the demo’s stock answer. With a provider connected, the Coach reads the sets you logged and what you asked.': 'Faça as séries que faltam com {0} {1}. Esta é a resposta pronta da demo. Com um provedor conectado, o Treinador lê as séries que você registrou e o que você perguntou.',
   'The demo’s stock suggestion, to show how one is applied.': 'A sugestão pronta da demo, para mostrar como uma é aplicada.',
   'This is the demo’s stock answer. With a provider connected, the Coach reads this workout and answers what you asked.': 'Esta é a resposta pronta da demo. Com um provedor conectado, o Treinador lê este treino e responde ao que você perguntou.',
+  // --- AI Coach: asking before a workout (components/CoachPreSheet.jsx, components/CoachLiveSheet.jsx, lib/coach-demo.js) ---
+  'Ask the Coach before you start': 'Perguntar ao Treinador antes de começar',
+  'Say how you are today, how much time you have, or what is in the way. The Coach reads the workout you are about to start.': 'Conte como você está hoje, quanto tempo tem ou o que atrapalha. O Treinador lê o treino que você vai começar.',
+  'e.g. “slept five hours and my right shoulder is tight”': 'ex.: “dormi cinco horas e o ombro direito está travado”',
+  'Train {0} today instead': 'Treinar {0} hoje no lugar',
+  'Rest today': 'Descansar hoje',
+  'Only today changes. Your plan stays as it is.': 'Só o dia de hoje muda. Seu plano fica como está.',
+  'In place of {0}, as the Coach suggested before the workout': 'No lugar de {0}, como o Treinador sugeriu antes do treino',
+  'Suggested by the Coach before the workout': 'Sugerido pelo Treinador antes do treino',
+  'Leave {0} out today. This is the demo’s stock answer. With a provider connected, the Coach reads the workout you are about to start and what you told it.': 'Deixe {0} de fora hoje. Esta é a resposta pronta da demo. Com um provedor conectado, o Treinador lê o treino que você vai começar e o que você contou.',
+  'Train {0} today instead. This is the demo’s stock answer.': 'Treine {0} hoje no lugar. Esta é a resposta pronta da demo.',
 }
 
 export default { ...pt, ...PT_BR_OVERRIDES }

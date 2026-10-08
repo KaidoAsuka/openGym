@@ -145,6 +145,14 @@ if (kind === 'adjust') {
 // on the first exercise that still has work sets to do, so a test can check the session arrived.
 if (kind === 'live') {
   const L = P.live || {};
+  // Asked before the session, and about the day: "rest" calls it off, "another" puts the first
+  // routine of the plan that is not today's in its place. Anything else is answered as below.
+  const said = (P.userNote || '').toLowerCase();
+  const other = (P.plan?.routines || []).find(r => (r.ex || []).length && !(L.routines || []).includes(r.id));
+  if (L.pre && said.includes('rest')) out({ coach_contract: 1, reply: 'Take today off.', day: { do: 'rest', why: 'The fixture rests when it is asked to.' } });
+  if (L.pre && said.includes('another') && other) {
+    out({ coach_contract: 1, reply: `Train ${other.name || 'the other session'} today; ${(P.recent || []).length} session(s) in the last two weeks.`, day: { do: 'train', routine: other.id, why: 'The fixture trains the other session when it is asked to.' } });
+  }
   const e = (L.entries || []).find(x => x.setsLeft > 0);
   if (!e) out({ coach_contract: 1, reply: 'Every set of the session is done — nothing is left to change today.' });
   out({

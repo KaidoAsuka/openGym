@@ -10,6 +10,8 @@ import { createRoot } from 'react-dom/client'
 import { useStore } from '../store/useStore.js'
 import { startFlow } from '../sheets.jsx'
 import Home from './Home.jsx'
+import { CONSENT_VERSION } from '../lib/coach.js'
+import { todayISO } from '../lib/format.js'
 
 const nav = vi.fn()
 vi.mock('react-router-dom', () => ({ useNavigate: () => nav }))
@@ -46,6 +48,23 @@ describe('Home — the way to the Start screen when a plan already owns today', 
   it('offers the door on a planned day, where the Start button would start the plan', () => {
     setS(); mount()
     expect(door()).toBeTruthy()
+  })
+
+  // A word with the Coach about today's session (components/CoachPreSheet.jsx) sits above the
+  // door, where there is a Coach that was given the go-ahead; and not once today's session is done.
+  it('offers a word with the Coach first where there is one, and not otherwise', () => {
+    const ask = () => [...host.querySelectorAll('button')].find(b => b.textContent.includes('Ask the Coach before you start'))
+    setS(); mount()
+    expect(ask()).toBeFalsy()
+    const coach = { consent: { agreedAt: '2026-10-08T00:00:00Z', version: CONSENT_VERSION } }
+    act(() => { setS({ coach }); useStore.setState({ user: { id: 'u1', name: 'Sam' }, config: { coach: { enabled: true } } }) })
+    expect(ask()).toBeTruthy()
+    expect(door()).toBeTruthy()
+    act(() => { setS({ coach, week: {} }); useStore.setState({ user: { id: 'u1', name: 'Sam' } }) })
+    expect(ask()).toBeFalsy()
+    const today = todayISO()
+    act(() => { setS({ coach, workouts: [{ id: 'w1', d: today, name: 'Push', routineIds: ['r1'], start: 1, end: 2, entries: [] }] }); useStore.setState({ user: { id: 'u1', name: 'Sam' } }) })
+    expect(ask()).toBeFalsy()
   })
 
   it('opens the Start screen without starting anything', () => {

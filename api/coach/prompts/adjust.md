@@ -6,7 +6,7 @@ Decide whether the weeks not yet trained should change. On most days they should
 
 ## How to decide
 
-- Read the sessions in `window` logged since `cycle.lastCheck.on` (all of them when there is no `lastCheck`): what was asked (`target`), what was done, at what effort, with which marks and notes.
+- Read the sessions in `window` logged since `cycle.lastCheck.on` (all of them when there is no `lastCheck`): what was asked (`target`), what was done, at what effort, with which marks and notes, and what you advised while the session was under way (`coached`). A set done below its target on your advice was not missed: judge the coming weight by what led to the advice, and say in `why` that the session was changed on the day.
 - **Hold every coming weight against the programme.** When `program` is present, its `structure` and `progression` say how a load is derived and what follows a session that was made or missed. A coming weight that does not follow from that rule and from `lifts` is wrong: correct it, and name the rule in `why` (W3). A programme that moves the load after every session has its next session set now, from the one just trained.
 - Without a programme, the W rules decide: step up what was made with room to spare, hold what was only just made, step back what was missed twice (W4, W7).
 - **Fill in what was left rough.** A week within the next two that has no numbers of its own (its exercises carry a `set` from an earlier week, or none) and should differ from the week before gets its numbers now. A lift that had no record when the plan was written and has one in `lifts` now gets its weights (W6).

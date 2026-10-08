@@ -252,6 +252,21 @@ describe('session notes', () => {
     expect(w.entries[0]).toMatchObject({ flags: ['equipment'], note: 'rack taken at first' })
   })
 
+  // What the Coach suggested during the session and they took (lib/coach-live.js) is part of
+  // what happened: a later reading has to know a weight came down on advice. What was said is not.
+  it('keeps what was taken of the Coach’s suggestions, read field by field, and nothing of the talk', () => {
+    const a = active({})
+    a.coached = [
+      { id: '0025', op: 'change-remaining', n: 2, w: 55, was: { w: 60 }, why: ' Second set at RPE 9.5. ', junk: true },
+      { id: '0025', op: 'not-an-op' },
+    ]
+    a.coachTalk = [{ id: 'q1', who: 'user', text: 'heavy' }, { id: 'q1.a', turn: 'q1', who: 'coach', text: 'Lower it.' }]
+    const w = buildCompletedWorkout(a)
+    expect(w.coached).toEqual([{ id: '0025', op: 'change-remaining', n: 2, w: 55, was: { w: 60 }, why: 'Second set at RPE 9.5.' }])
+    expect('coachTalk' in w).toBe(false)
+    expect('coached' in buildCompletedWorkout(active({}))).toBe(false)
+  })
+
   it('keeps a whole-session note on the workout', () => {
     const a = active({})
     expect(buildCompletedWorkout({ ...a, note: 'slept badly' }).note).toBe('slept badly')

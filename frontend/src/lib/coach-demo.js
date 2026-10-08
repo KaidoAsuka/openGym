@@ -21,6 +21,7 @@ import { planHash } from './coach.js'
 import { t } from './i18n.js'
 
 const DELAY = 2200      // long enough to see "the Coach is thinking…", short enough to forgive
+const LIVE_DELAY = 1500 // a question between two sets is answered sooner than a plan is written
 
 let pending = null
 let job = null
@@ -283,6 +284,35 @@ export const demoRefine = S => start('create', () => {
 export const demoDebrief = (S, workoutId) => {
   if (!(S.workouts || []).some(w => w && w.d)) throw Object.assign(new Error(t('There’s no workout to look at yet. Log one first.')), { status: 409, code: 'noworkout' })
   return start('debrief', () => buildDebrief(S, workoutId))
+}
+/* A question asked during a workout. There is no model to ask here, so the answer is a stock
+   one, but it is made from the workout in front of them and comes back in the shape a real one
+   has: a reply, one op the sheet can apply, and the mark for what was said. */
+let liveAsked = 0
+export function demoLive(S, body = {}) {
+  const A = body.session || S.active
+  const entries = Array.isArray(A?.entries) ? A.entries : []
+  const at = [body.focus, A?.cur, 0].find(i => Number.isInteger(i) && entries[i])
+  const e = entries[at]
+  return new Promise((resolve, reject) => setTimeout(() => {
+    if (!e) { reject(Object.assign(new Error(t('There’s no workout under way to ask about.')), { status: 400, code: 'nolive' })); return }
+    const left = (e.sets || []).filter(s => s && !isWarmupRow(s) && !s.done)
+    const w = Number(left[0]?.w) || 0
+    const step = S.unit === 'lb' ? 5 : 2.5
+    let lighter = Math.round((w * 0.95) / step) * step
+    if (lighter >= w) lighter = w - step
+    const answer = { id: 'demo-live-' + Date.now().toString(36), cap: { used: ++liveAsked, limit: 30 } }
+    if (modeOf({ ...(e.target || {}), id: e.id }) === 'reps' && lighter > 0) {
+      resolve({
+        ...answer,
+        reply: t('Take the sets still to do at {0} {1}. This is the demo’s stock answer. With a provider connected, the Coach reads the sets you logged and what you asked.', fmtNum(lighter), S.unit),
+        ops: [{ op: 'change-remaining', entry: at, exId: e.id, weight: lighter, why: t('The demo’s stock suggestion, to show how one is applied.') }],
+        flags: [{ entry: at, exId: e.id, flag: 'heavy' }]
+      })
+    } else {
+      resolve({ ...answer, reply: t('This is the demo’s stock answer. With a provider connected, the Coach reads this workout and answers what you asked.'), ops: [], flags: [] })
+    }
+  }, LIVE_DELAY))
 }
 export const demoResolve = () => { pending = null; return { ok: true } }
 export const demoDisclosure = () => ({

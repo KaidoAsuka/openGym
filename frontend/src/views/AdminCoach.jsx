@@ -293,6 +293,23 @@ export default function AdminCoach() {
             <span className="v"><input className="num" type="number" min="200" max="4000" defaultValue={d.maxMessageLen} disabled={busy}
               onBlur={e => +e.target.value !== d.maxMessageLen && patch({ maxMessageLen: +e.target.value })} /></span></div>
 
+          {/* A question asked between two sets is answered in its own request, counted on its own
+              and, when one is named here, by a quicker model than the one that writes plans. */}
+          <div className="adm-group-t" style={{ marginTop: 14 }}>Questions during a workout</div>
+          <div className="adm-hint">Someone asks between two sets and waits for the answer. These are counted apart from the runs above, so a session's questions cannot use up the day's reviews. 0 means no limit.</div>
+          <div className="adm-kv"><span className="k">Per user, per day</span>
+            <span className="v"><input className="num" type="number" min="0" max="500" defaultValue={d.caps.livePerProfileDaily ?? 30} disabled={busy} aria-label="Questions during a workout, per user, per day"
+              onBlur={e => {
+                if (e.target.value.trim() === '') { e.target.value = d.caps.livePerProfileDaily ?? 30; return }
+                if (+e.target.value !== (d.caps.livePerProfileDaily ?? 30)) patch({ caps: { ...d.caps, livePerProfileDaily: +e.target.value } })
+              }} /></span></div>
+          <div className="adm-field" style={{ marginTop: 10 }}>
+            <label>Model for these questions</label>
+            <TextField key={d.provider + ':live'} defaultValue={d.liveModel || ''} placeholder="Same as the model above" disabled={busy} aria-label="Model for questions during a workout"
+              onBlur={e => e.target.value.trim() !== (d.liveModel || '') && patch({ liveModel: e.target.value.trim() })} />
+            <div className="adm-hint" style={{ marginTop: 6 }}>Optional. A faster model keeps the wait short; leave it empty to use the same one.</div>
+          </div>
+
           <div className="adm-group-t" style={{ marginTop: 14 }}>Compare with others</div>
           <div className="row between" style={{ gap: 12, alignItems: 'flex-start' }}>
             <div className="adm-hint" style={{ margin: 0 }}>

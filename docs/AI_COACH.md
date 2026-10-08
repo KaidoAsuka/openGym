@@ -267,7 +267,7 @@ renders from, so the screen cannot drift from the payload — are:
 | Category | What it covers |
 | --- | --- |
 | `plan` | routines, exercises, sets/reps, schedule, progression settings |
-| `training` | logged sets, targets, effort ratings, durations, PRs and session notes in the review window, and the marks and notes you put on exercises |
+| `training` | logged sets, targets, effort ratings, durations, PRs and session notes in the review window, the marks and notes you put on exercises, and the workout under way when you ask a question during it |
 | `bodyweight` | weigh-ins in the window and your goal weight |
 | `profile` | the intake answers you gave the Coach, including any limitations, and what you set under *Goal & checkpoint* (your goal in your own words, target lifts, the block's length and dates) |
 | `cohort` (optional) | only with comparison on and your own opt-in: anonymous medians from the other people sharing — never their data, and never yours to them beyond the same medians |
@@ -440,16 +440,46 @@ remark is counted the way a mark you set yourself is.
   cap of its own, `livePerProfileDaily` (30 a day by default, 0 for none), so a session's
   questions do not use up the day's reviews; the instance's daily cap counts them too. One
   question at a time for a profile, and it does not wait for a job that is running.
-- **Which model.** The provider's own, unless `liveModel` is set for it
-  (`POST /api/admin/coach/config`): a quicker model for the answers someone is standing and
-  waiting for.
+- **Which model.** The provider's own, unless one is named for these questions (Admin → AI
+  Coach → Advanced → Questions during a workout, or `liveModel` in
+  `POST /api/admin/coach/config`): a quicker model for the answers someone is standing and
+  waiting for. The same place sets the daily cap.
 - **What is kept.** The day's count, and the latest answer for fifteen minutes, so a request
   that died on its way back can be sent again under the same `turnId` without a second call.
   The thread of the conversation is the app's to keep, with the session. An answered question
   leaves no line in the instance log; a failed one leaves its class and duration, never its text.
 
-The screen for it is not built yet: the route, the ops and the checks are, and the fixture
-provider answers them.
+**On the phone.** "Ask the Coach" is in the workout screen's ⋯ menu and in each exercise's own,
+once the Coach has your go-ahead and only in a workout under way (not one being logged for a past
+day, not a saved one open in the editor). It opens a sheet over the workout: you type, the
+answer arrives in about a quarter of a minute, and each op is a card with one button
+(`frontend/src/components/CoachLiveSheet.jsx`). The sheet can be closed while the answer is on
+its way; it is written into the workout when it lands.
+
+- **Nothing moves until you tap.** A card is applied by `frontend/src/lib/coach-live.js`, which
+  checks it again first, with the code the server checked the answer with, against the workout
+  as it is by then. If you did the sets, swapped the exercise or changed the numbers yourself in
+  the meantime, the card says it no longer fits and cannot be applied. An exercise you moved is
+  found again by its id when the workout holds it once.
+- **Only the workout changes.** A changed weight is set on the rows still to do, the way a
+  weight you type is; the exercise's target for the day is left alone, and so are the plan and
+  the cycle. A swap is built like a swap from the picker: sets already logged stay with the
+  exercise they were done on.
+- **Marks are written at once.** A mark is what you said about the exercise, noted for you; the
+  answer shows which it set, with an Undo.
+- **What a finished workout keeps.** The ops you took, as `coached` on the workout: the
+  exercise, the op, the numbers before and after, and the reason. They are shown in the
+  workout's detail and read back by the Coach (`api/coach/core/payload.js`), so the look that
+  follows a session knows a weight came down on its own advice and does not count those sets as
+  missed. What was said stays with the session and is gone when it ends.
+- **When the answer does not come.** A request that met "still answering" or a dead connection
+  is sent again under the same `turnId`, a few times; after that the sheet says no answer came
+  back and offers to ask again. A refusal with a reason (the daily cap, no provider) is shown in
+  the app's language and is not retried by itself.
+
+A phone that runs the Coach with its own key answers these questions itself, through the same
+pipeline and counted on a cap of its own (30 a day); the demo answers with a stock suggestion
+made from the workout in front of you.
 
 A rejected answer gets **one** repair round, with the errors handed back verbatim. Two failures
 is a provider problem rather than a prompting problem, and a retry loop against a paid account

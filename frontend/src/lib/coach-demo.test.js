@@ -10,8 +10,9 @@
 // test here starts a job and then drains it. A test that leaves one running would 409 the next.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
-  demoStatus, demoPlan, demoReview, demoRefine, demoDebrief, demoResolve, demoCohort, demoDisclosure
+  demoStatus, demoPlan, demoReview, demoRefine, demoDebrief, demoResolve, demoCohort, demoDisclosure, demoLive
 } from './coach-demo.js'
+import { fitOp, addQuestion, addAnswer } from './coach-live.js'
 import { EXDB, EXIDX } from './exercises.js'
 import { planHash, validateProposal, applyChangeSet } from './coach.js'
 import { DATA_CATEGORIES } from '../../../api/coach/core/categories.js'
@@ -400,5 +401,48 @@ describe('coach-demo — defects found while writing these tests', () => {
     expect(() => think(() => demoDebrief(S))).not.toThrow()
     expect(demoStatus().pending).toMatchObject({ kind: 'debrief', workout: { id: 'bare', vol: 0, sets: 0 } })
     expect(demoStatus().job).toBe(null)
+  })
+})
+
+describe('coach-demo — a question during a workout', () => {
+  const active = () => ({
+    id: 'w-live', d: day(0), name: 'A', start: NOW - 600000, cur: 1,
+    entries: [
+      { id: SQUAT, target: { mode: 'reps', sets: 2, reps: 5, weight: 100 }, sets: [{ w: 100, r: 5, done: true }, { w: 100, r: 5, done: false }] },
+      { id: PRESS, target: { mode: 'reps', sets: 2, reps: 5, weight: 70 }, sets: [{ w: 70, r: 5, done: false }, { w: 70, r: 5, done: false }] },
+      { id: PLANK, target: { mode: 'time', sets: 1, sec: 45 }, sets: [{ sec: 45, w: 0, done: false }] }
+    ]
+  })
+  beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(NOW) })
+  afterEach(() => { vi.useRealTimers() })
+  const ask = async body => { const p = demoLive({ unit: 'kg' }, body); await vi.advanceTimersByTimeAsync(1500); return p }
+
+  it('answers in the shape a real answer has, with an op this workout can take', async () => {
+    const A = active()
+    const out = await ask({ text: 'heavy', session: A, focus: 0 })
+    expect(out.reply).toEqual(expect.any(String))
+    expect(out.ops).toEqual([{ op: 'change-remaining', entry: 0, exId: SQUAT, weight: 95, why: expect.any(String) }])
+    expect(out.flags).toEqual([{ entry: 0, exId: SQUAT, flag: 'heavy' }])
+    expect(out.cap).toMatchObject({ limit: 30 })
+    // The sheet can take it as it takes a server's: written into the workout, and it fits.
+    addQuestion(A, { id: 'q1', text: 'heavy' })
+    expect(addAnswer(A, 'q1', out)).toBeTruthy()
+    expect(fitOp(A, out.ops[0])).toMatchObject({ entry: 0, weight: 95 })
+    expect(A.entries[0].flags).toEqual(['heavy'])
+  })
+
+  it('is about the exercise they are on when the question names none, and says so plainly where it has nothing to suggest', async () => {
+    expect((await ask({ text: 'heavy', session: active() })).ops[0]).toMatchObject({ entry: 1, exId: PRESS, weight: 67.5 })
+    const hold = await ask({ text: 'long', session: active(), focus: 2 })
+    expect(hold.ops).toEqual([])
+    expect(hold.flags).toEqual([])
+    expect(hold.reply).toEqual(expect.any(String))
+  })
+
+  it('refuses when there is no workout to ask about', async () => {
+    const p = demoLive({ unit: 'kg' }, { text: 'heavy', session: { entries: [] } })
+    const failed = expect(p).rejects.toMatchObject({ code: 'nolive' })
+    await vi.advanceTimersByTimeAsync(1500)
+    await failed
   })
 })

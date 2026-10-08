@@ -650,4 +650,44 @@ test('the admin can set the questions\' own cap and model, and saving the other 
   } finally { p.close(); }
 });
 
+/* ---------------- what was taken, read back ---------------- */
+
+test('what they took of an answer is read back off the finished workout, by name and cut', () => {
+  const S = state();
+  const w = S.workouts.at(-1);
+  const id = w.entries[0].id;
+  w.coached = [
+    { id, op: 'change-remaining', n: 3, w: 95, was: { w: 100, SECRET: 'SECRET-21' }, why: ' Second set at RPE 9.5. ', SECRET: 'SECRET-22' },
+    { id, op: 'swap', to: DB_BENCH, n: 3, r: 8, w: 25 },
+    { id, op: 'swap' },                                   // a swap that names nothing brought in
+    { id, op: 'grant-admin', why: 'SECRET-23' },          // not an op
+    { id: { $ne: 1 }, op: 'skip' },                       // not an id
+    'skip', null,
+    { id, op: 'skip', n: 500, w: 'heavy', why: 'x'.repeat(900) }
+  ];
+  const p = payload.build(S, { handle: H, kind: 'review' });
+  const read = p.window.workouts.find(x => x.coached);
+  assert.ok(read, 'the workout that carries it');
+  assert.deepEqual(read.coached, [
+    { id, name: 'barbell full squat', op: 'change-remaining', sets: 3, weight: 95, was: { weight: 100 }, why: 'Second set at RPE 9.5.' },
+    { id, name: 'barbell full squat', op: 'swap', sets: 3, weight: 25, reps: 8, to: DB_BENCH, toName: 'dumbbell bench press' },
+    { id, name: 'barbell full squat', op: 'skip', why: 'x'.repeat(200) }
+  ]);
+  assert.ok(!JSON.stringify(p).includes('SECRET-'), 'nothing rides along on a record');
+  // A workout nothing was taken in has no key at all.
+  assert.ok(p.window.workouts.filter(x => !x.coached).every(x => !('coached' in x)));
+});
+
+test('the phone and the server keep the same number of them, and the prompts say how to read one', () => {
+  const S = state();
+  const w = S.workouts.at(-1);
+  w.coached = Array.from({ length: payload.COACHED_MAX + 5 }, (_, i) => ({ id: w.entries[0].id, op: 'remove-set', n: 1, why: 'n' + i }));
+  const read = payload.build(S, { handle: H, kind: 'review' }).window.workouts.find(x => x.coached);
+  assert.equal(read.coached.length, payload.COACHED_MAX);
+  assert.equal(read.coached.at(-1).why, 'n' + (payload.COACHED_MAX + 4), 'the latest ones');
+  assert.match(PROMPTS.common, /\*\*Taken during the session\.\*\* `coached` on a workout/);
+  assert.match(PROMPTS.common, /They are not misses and not a stall/);
+  assert.match(PROMPTS.adjust, /what you advised while the session was under way \(`coached`\)/);
+});
+
 function tempDir() { return process.env.DATA_DIR; }

@@ -507,6 +507,49 @@ describe('AdminCoach — daily caps (what bounds the spend on the operator\'s ac
     expect(sent('/api/admin/coach/config')[0].body).toEqual({ caps: { perProfileDaily: 0, instanceDaily: 50 } })
   })
 
+  // Questions asked during a workout are counted apart from the runs above (caps.livePerProfileDaily)
+  // and can be given a quicker model of their own (liveModel).
+  const liveCap = () => host.querySelector('input[aria-label="Questions during a workout, per user, per day"]')
+  const liveModel = () => host.querySelector('input[aria-label="Model for questions during a workout"]')
+
+  it('the cap on questions during a workout is a field of its own, sent with the other two', async () => {
+    await mount()
+    // A server from before the setting names none: the box shows the default it would run with.
+    expect(liveCap().value).toBe('30')
+    await blurWith(liveCap(), '50')
+    expect(sent('/api/admin/coach/config')[0].body).toEqual({ caps: { perProfileDaily: 5, instanceDaily: 50, livePerProfileDaily: 50 } })
+  })
+
+  it('shows the stored cap, writes nothing for the same number, and puts it back when the box is emptied', async () => {
+    mocks.routes['/api/admin/coach'] = status({ caps: { perProfileDaily: 5, instanceDaily: 50, livePerProfileDaily: 12 } })
+    await mount()
+    expect(liveCap().value).toBe('12')
+    await blurWith(liveCap(), '12')
+    await blurWith(liveCap(), '')
+    expect(sent('/api/admin/coach/config')).toHaveLength(0)
+    expect(liveCap().value).toBe('12')
+    // The other two still send exactly what they sent before the field existed, plus the stored one.
+    await blurWith(capFields()[0], '8')
+    expect(sent('/api/admin/coach/config')[0].body).toEqual({ caps: { perProfileDaily: 8, instanceDaily: 50, livePerProfileDaily: 12 } })
+  })
+
+  it('a model for those questions is named on its own', async () => {
+    await mount()
+    expect(liveModel().value).toBe('')
+    await blurWith(liveModel(), '  claude-haiku-5-5  ')
+    expect(sent('/api/admin/coach/config')[0].body).toEqual({ liveModel: 'claude-haiku-5-5' })
+  })
+
+  it('shows the stored model, writes nothing when it is unchanged, and clearing the box goes back to the main one', async () => {
+    mocks.routes['/api/admin/coach'] = status({ liveModel: 'claude-haiku-5-5' })
+    await mount()
+    expect(liveModel().value).toBe('claude-haiku-5-5')
+    await blurWith(liveModel(), 'claude-haiku-5-5')
+    expect(sent('/api/admin/coach/config')).toHaveLength(0)
+    await blurWith(liveModel(), '')
+    expect(sent('/api/admin/coach/config')[0].body).toEqual({ liveModel: '' })
+  })
+
   it('the community-medians switch is a separate write and does not carry the caps with it', async () => {
     await mount()
     const switches = [...host.querySelectorAll('[role="switch"]')]

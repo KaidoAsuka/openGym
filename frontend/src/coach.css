@@ -317,3 +317,40 @@
 .cmp-bar i{display:block;height:100%;border-radius:7px;background:var(--label-3);opacity:.55}
 .cmp-bar.you i{background:var(--acc);opacity:1}
 .cmp-bar span{position:absolute;left:8px;top:0;line-height:22px;font-size:11.5px;font-weight:600;color:var(--label);font-variant-numeric:tabular-nums;text-shadow:0 0 6px var(--bg)}
+
+/* ---------- asking the Coach during a workout (components/CoachLiveSheet.jsx) ---------- */
+/* A sheet over the workout screen. The sheet itself scrolls; the composer stands on its foot. */
+.live h3{margin-bottom:2px}
+.live-about{font-size:13px;color:var(--label-2);margin-bottom:12px}
+.live-msgs{padding-bottom:10px;min-height:120px}
+.live-msgs .bub{font-size:15px}
+.live-in{
+  position:sticky;bottom:calc(-20px - var(--sab));margin:0 -18px calc(-20px - var(--sab));
+  padding:8px 18px calc(12px + var(--sab));display:flex;gap:8px;align-items:flex-end;
+  background:var(--bg-el);border-top:var(--hair) solid var(--sep)
+}
+:root[data-theme="light"] .live-in{background:var(--bg)}
+:root[data-native-kb] .live-in{bottom:-20px;margin-bottom:-20px;padding-bottom:12px}
+.live-in textarea{
+  flex:1;min-height:44px;max-height:120px;resize:none;border-radius:22px;padding:11px 16px;
+  font-size:16px;line-height:1.35;background:var(--surface);color:var(--label);border:none;outline:none;
+  font-family:inherit;letter-spacing:-.008em
+}
+.live-in textarea:focus{box-shadow:inset 0 0 0 1.5px var(--acc)}
+.live-in textarea::placeholder{color:var(--label-3)}
+.live-link{background:none;color:var(--acc);font-size:13px;padding:6px 8px;align-self:flex-start}
+.live-ops{margin-top:6px}
+.live-ops .pcard-chg:first-child{border-top:none}
+.live-ops .pcard-chg{align-items:center}
+.live-apply{flex:none}
+.live-apply:disabled{opacity:.35}
+.live-done{flex:none;display:inline-flex;align-items:center;gap:4px;font-size:13px;color:var(--acc);font-weight:600}
+.live-only{font-size:12px;color:var(--label-3);padding:8px 18px 10px;border-top:var(--hair) solid var(--sep)}
+.live-marks{display:flex;align-items:center;gap:2px;font-size:13px;color:var(--label-2);margin:4px 8px 0}
+/* what was taken of it, in the finished workout's detail */
+.live-taken{margin:4px 0 12px}
+.live-taken-h{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--label-2);margin-bottom:6px}
+.live-taken-h .icn{color:var(--acc);font-size:14px}
+.live-taken-i{font-size:13px;line-height:1.42;margin-bottom:8px}
+.live-taken-i b{font-weight:600;text-transform:capitalize}
+.live-why{color:var(--label-2)}

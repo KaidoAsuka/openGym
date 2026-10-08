@@ -192,6 +192,69 @@ describe('the Coach on a phone with its own key', () => {
     expect(wire.calls[1].body.messages[1].content).toContain('"previous"')
   })
 
+  // A question asked during a workout: the server's liveTurn, run here. Answered in the call
+  // itself, with the session the app holds, and counted on its own.
+  const active = () => ({
+    id: 'w-live', d: todayISO(), name: 'A', start: Date.now() - 600000, cur: 0,
+    entries: [{ id: EX, target: { sets: 3, reps: 8, weight: 40 }, sets: [{ w: 40, r: 8, done: true }, { w: 40, r: 8, done: false }, { w: 40, r: 8, done: false }] }]
+  })
+  const liveAnswer = { coach_contract: 1, reply: 'Take the last two sets at 37.5 kg.', ops: [{ op: 'change-remaining', entry: 0, exId: EX, weight: 37.5, why: 'The first set was a grind.' }], flags: [{ entry: 0, exId: EX, flag: 'heavy' }] }
+
+  it('answers a question asked during a workout in the call itself, through the real pipeline', async () => {
+    wire.answer = chat(JSON.stringify(liveAnswer))
+    const S = state()
+    const out = await local.localLive(S, { text: '  the first set was a grind  ', session: active(), focus: 0, thread: [{ who: 'user', text: 'earlier' }, { who: 'coach', text: 'noted' }], turnId: 'q1' })
+    expect(out).toMatchObject({ reply: 'Take the last two sets at 37.5 kg.', cap: { used: 1, limit: local.LOCAL_LIVE_DAILY_CAP } })
+    expect(out.ops).toEqual([{ op: 'change-remaining', entry: 0, exId: EX, weight: 37.5, why: 'The first set was a grind.' }])
+    expect(out.flags).toEqual([{ entry: 0, exId: EX, flag: 'heavy' }])
+    // No job was started and nothing waits to be polled for.
+    expect((await local.localStatus()).job).toBeNull()
+    expect((await loadCoachDevice()).pending).toBeFalsy()
+    // What went out: the live task, their words, the session they are in and what was said before.
+    const sent = wire.calls[0].body.messages[1].content
+    expect(sent).toContain('"task":"live"')
+    expect(sent).toContain('"userNote":"the first set was a grind"')
+    expect(sent).toContain('"setsLeft":2')
+    expect(sent).toContain('"text":"noted"')
+    // Counted apart from the day's runs.
+    const d = await loadCoachDevice()
+    expect(d.liveDaily).toEqual({ d: todayISO(), n: 1 })
+    expect(d.daily).toBeFalsy()
+  })
+
+  it('an op the session cannot take is refused by the validator, here as on a server', async () => {
+    wire.answer = chat(JSON.stringify({ ...liveAnswer, ops: [{ op: 'change-remaining', entry: 0, exId: EX2, weight: 30, why: 'wrong exercise' }] }))
+    await expect(local.localLive(state(), { text: 'heavy', session: active() })).rejects.toMatchObject({ code: 'unusable', status: 502 })
+    expect(wire.calls).toHaveLength(2)   // the one repair round, then done
+  })
+
+  it('refuses a live question it cannot answer, with the classes a server uses', async () => {
+    const noConsent = state(); noConsent.coach.consent = null
+    await expect(local.localLive(noConsent, { text: 'heavy', session: active() })).rejects.toMatchObject({ code: 'consent', status: 403 })
+    await expect(local.localLive(state(), { text: '   ', session: active() })).rejects.toMatchObject({ code: 'empty' })
+    await expect(local.localLive(state(), { text: 'heavy' })).rejects.toMatchObject({ code: 'nolive' })
+    // A past workout being filed is not one under way.
+    await expect(local.localLive(state(), { text: 'heavy', session: { ...active(), backfill: { d: '2026-08-01' } } })).rejects.toMatchObject({ code: 'nolive' })
+    expect(wire.calls).toHaveLength(0)
+
+    // A 4xx the adapter does not retry (429 would wait out two retries first).
+    wire.answer = { status: 404, body: { error: { message: 'The model does not exist, or your quota does not cover it' } } }
+    await expect(local.localLive(state(), { text: 'heavy', session: active() })).rejects.toMatchObject({ code: 'provider', detail: expect.stringContaining('quota') })
+
+    await saveCoachDevice({ liveDaily: { d: todayISO(), n: local.LOCAL_LIVE_DAILY_CAP } })
+    await expect(local.localLive(state(), { text: 'heavy', session: active() })).rejects.toMatchObject({ code: 'livecap', status: 429 })
+  })
+
+  it('answers one live question at a time, and does not wait behind a running job', async () => {
+    wire.answer = chat(JSON.stringify(review))
+    await local.localReview(state())
+    wire.answer = chat(JSON.stringify(liveAnswer))
+    const first = local.localLive(state(), { text: 'heavy', session: active() })
+    await expect(local.localLive(state(), { text: 'again', session: active() })).rejects.toMatchObject({ code: 'busy', status: 409 })
+    await expect(first).resolves.toMatchObject({ reply: expect.any(String) })
+    await settle()
+  })
+
   it('disclosure says who pays and where it goes', async () => {
     const d = await local.localDisclosure()
     expect(d.payer).toBe('you')

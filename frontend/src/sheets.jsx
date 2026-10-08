@@ -58,6 +58,7 @@ import { copyText } from './lib/clipboard.js'
 import { queueRemaining, pinState } from './lib/queue.js'
 import { cleanFlags, setEntryFlags } from './lib/exercise-flags.js'
 import { FlagPicker, FlagTags } from './components/ExerciseFlags.jsx'
+import { CoachedLines } from './components/CoachLiveSheet.jsx'
 
 const S = () => useStore.getState().S
 const update = (...a) => useStore.getState().update(...a)
@@ -2249,6 +2250,7 @@ function WorkoutDetail({ w, close }) {
         {e.note && <div className="dim" style={{ marginTop: 3 }}>{e.note}</div>}
       </div>)}
     </div>}
+    <CoachedLines workout={w} unit={S().unit} />
     {/* Progress photos and form-check videos: added and removed right here, on the saved record. */}
     <WorkoutMediaSection w={w} />
     <div className="small muted" style={{ margin: '4px 0 6px' }}>{t('Session note')}</div>

@@ -42,6 +42,11 @@ import { nextOpenSet, workoutKeyAction } from '../lib/workout-keys.js'
 import { MUSCLE_NAME } from '../lib/muscles.js'
 import { keepMarked } from '../lib/exercise-flags.js'
 import { FlagTags } from '../components/ExerciseFlags.jsx'
+import { DEMO } from '../lib/demo.js'
+import { MOBILE } from '../lib/mobile.js'
+import { openCoachLive } from '../components/CoachLiveSheet.jsx'
+import { canAskLive } from '../lib/coach-live.js'
+import { coachAvailable, hasConsent } from '../lib/coach.js'
 
 // How long after a key starts a hold the same key is not yet its "Done" (#133). A USB button
 // that bounces, or a double press, sends two presses a moment apart: the first starts the hold,
@@ -99,7 +104,7 @@ const RTL_LETTER = /[֐-ࣿיִ-﷿ﹰ-﻿]/
 // enough to turn over, far shorter than the rest the set earns once both sides are held.
 const SWITCH_SIDES_SEC = 10
 
-function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSide, onField, onAddSet, onRemoveSet, onAddWarmup, onRemoveSetAt, onCopySetAt, onStartTimed, onPairPrev, onPairNext, onSetRowRef, onProgressionSettings, onRest, onNoProg, routineUpdate, onSwap, onMoveUp, onMoveDown, canMoveUp, canMoveDown, onRemoveExercise, busy }) {
+function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSide, onField, onAddSet, onRemoveSet, onAddWarmup, onRemoveSetAt, onCopySetAt, onStartTimed, onPairPrev, onPairNext, onSetRowRef, onAskCoach, onProgressionSettings, onRest, onNoProg, routineUpdate, onSwap, onMoveUp, onMoveDown, canMoveUp, canMoveDown, onRemoveExercise, busy }) {
   const S = useStore(s => s.S)
   const update = useStore(s => s.update)
   const working = useUI(s => s.work)
@@ -376,6 +381,7 @@ function ExerciseBlock({ entryIdx, compact, dense, editing, onToggle, onToggleSi
     titleClass: exerciseNameClass(ex),
     sections: [
       { title: t('Today'), items: [
+        onAskCoach && { icon: 'sparkles', label: t('Ask the Coach'), onClick: onAskCoach },
         onSwap && { icon: 'swap', label: t('Swap exercise'), onClick: onSwap, disabled: busy },
         { icon: 'sunrise', label: t('Add warm-up set'), onClick: onAddWarmup },
         { icon: 'note', label: entry.note ? t('Edit note') : t('Add note'), sub: entry.note || undefined, onClick: () => exerciseNoteSheet(entryIdx) },
@@ -894,6 +900,12 @@ function ActiveWorkout() {
   const { startRest: liveRest, stopRest, stopWork, work, timer } = useUI()
   const A = S.active
   const editing = !!A.editingWorkoutId
+  // Asking the Coach about this workout (components/CoachLiveSheet.jsx): where there is a Coach,
+  // it was given the go-ahead, and this is a workout under way rather than a past one being filed.
+  const config = useStore(s => s.config)
+  const user = useStore(s => s.user)
+  const coachMode = useStore(s => s.coachLocal?.mode)
+  const askCoach = coachAvailable(config, user, { demo: DEMO, mobile: MOBILE, coachMode }) && hasConsent(S) && canAskLive(A)
   // A past workout has no rest to time — the sets were done days ago. The work timer for
   // timed sets stays, since counting a hold is how its duration gets entered.
   const startRest = (A.backfill || editing) ? () => {} : liveRest
@@ -1213,6 +1225,7 @@ function ActiveWorkout() {
   // a superset member acts on that member, not on whatever the marker happens to point at.
   const blockProps = idx => ({
     editing,
+    onAskCoach: askCoach ? () => openCoachLive(idx) : null,
     onSwap: () => swapActiveWorkoutExercise(idx),
     onMoveUp: () => moveUnitAt(idx, -1),
     onMoveDown: () => moveUnitAt(idx, 1),
@@ -1346,6 +1359,7 @@ function ActiveWorkout() {
         { icon: 'gear', accent: true, chevron: true, label: t('Workout settings'),
           sub: [S.restSec > 0 ? t('{0} rest', fmtRest(S.restSec)) : t('No rest timer'), S.sound ? t('Sound') : t('Silent')].join(' · '),
           onClick: workoutSettingsSheet },
+        askCoach && { icon: 'sparkles', label: t('Ask the Coach'), sub: t('A question about this workout, answered in a few sentences'), onClick: () => openCoachLive() },
       ] },
       { title: t('Add'), items: [
         { icon: 'plusCircle', label: t('Add exercise'), onClick: addExercise },

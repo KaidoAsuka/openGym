@@ -15,7 +15,7 @@ import { LIBRARY, LIB_BY_ID, libraryHas, libraryName, librarySlice, isStretch, M
 import { planLoadForPayload, customBodyParts } from './plan-load.js';
 import { programsForPayload, programBrief } from './kb.js';
 import { cleanCyclePlan, numbersAt, cycleWeekOn, CYCLE_WEEKS_MAX, CYCLE_FOCUS_MAX } from './cycle.js';
-import { liveCounts, LIVE_ENTRIES_MAX, LIVE_ROWS_MAX, LIVE_THREAD_LINES, LIVE_THREAD_CHARS } from './live.js';
+import { liveCounts, LIVE_OPS, LIVE_ENTRIES_MAX, LIVE_ROWS_MAX, LIVE_THREAD_LINES, LIVE_THREAD_CHARS } from './live.js';
 
 export const CONTRACT = 1;
 // Bounds from FR-22. A review reads a training block, not a training career: more history
@@ -401,6 +401,46 @@ function skippedPart(w, withNote) {
   return out.length ? { skipped: out } : {};
 }
 
+/* ---------- what the Coach suggested during a session, and they took ----------
+   A question asked between two sets can be answered with ops on the session (live.js). The phone
+   keeps the ones the person took on the finished workout (`coached`,
+   frontend/src/lib/coach-live.js), and they are read back here, so that a later reading knows a
+   weight that came down mid-session was the Coach's own suggestion: the sets after it were done
+   as advised, not missed. Client-written like everything else on a workout, so every field is
+   read by name and by type, and the reason is cut.
+
+   frontend/src/lib/coach-live.test.js pins the ceiling to the one the phone keeps. */
+export const COACHED_MAX = 12;
+const COACHED_WHY_CHARS = 200;
+function coachedPart(w) {
+  const numbers = v => {
+    const o = {};
+    if (!v || typeof v !== 'object') return o;
+    if (num(v.w) !== undefined) o.weight = v.w;
+    if (num(v.r) !== undefined) o.reps = v.r;
+    if (num(v.sec) !== undefined) o.sec = v.sec;
+    return o;
+  };
+  const out = [];
+  for (const c of list(w.coached).slice(-COACHED_MAX)) {
+    if (!c || typeof c !== 'object' || ident(c.id) == null || !LIVE_OPS.includes(c.op)) continue;
+    const o = { id: ident(c.id), name: libraryName(c.id), op: c.op };
+    if (Number.isInteger(c.n) && c.n > 0 && c.n <= 20) o.sets = c.n;
+    Object.assign(o, numbers(c));
+    const was = numbers(c.was);
+    if (Object.keys(was).length) o.was = was;
+    if (c.op === 'swap') {
+      if (ident(c.to) == null) continue;
+      o.to = ident(c.to);
+      o.toName = libraryName(c.to);
+    }
+    const why = text(c.why, COACHED_WHY_CHARS).trim();
+    if (why) o.why = why;
+    out.push(o);
+  }
+  return out.length ? { coached: out } : {};
+}
+
 /** One older workout as a summary: what was done, the top set, whether targets were hit. */
 function compactWorkout(w) {
   return {
@@ -426,7 +466,8 @@ function compactWorkout(w) {
         ...marked(en, false)
       };
     }),
-    ...skippedPart(w, false)
+    ...skippedPart(w, false),
+    ...coachedPart(w)
   };
 }
 
@@ -446,7 +487,8 @@ function cleanWorkout(w) {
       sets: setsOf(en).map(cleanSet),
       ...marked(en, true)
     })),
-    ...skippedPart(w, true)
+    ...skippedPart(w, true),
+    ...coachedPart(w)
   };
 }
 

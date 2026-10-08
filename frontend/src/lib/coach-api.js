@@ -15,6 +15,7 @@ import { useUI } from '../store/useUI.js'
 import { freshDigests, adoptDigests } from './coach-digests.js'
 import { freshLooks, applyLooks } from './coach-cycle.js'
 import { appendChat } from './coach.js'
+import { canAskLive, newTurnId, addQuestion, addAnswer, addFailure, talkOf, threadFor } from './coach-live.js'
 
 const POLL_MS = 3000       // a job is running: often enough to feel live
 const IDLE_MS = 60000       // a Coach screen is open but nothing is running
@@ -121,6 +122,88 @@ export const resolvePending = async body => DEMO ? (await demo()).demoResolve() 
 export const forgetCoach = async () => DEMO ? (await demo()).demoResolve() : LOCAL() ? (await local()).localForget() : api('/api/coach/forget', { method: 'POST', body: '{}' })
 export const disclosure = async () => DEMO ? (await demo()).demoDisclosure() : LOCAL() ? (await local()).localDisclosure() : api('/api/coach/disclosure')
 
+/* ---------- a question asked during a workout ----------
+   Answered in the request that asks it (POST /api/coach/live), not by a job, so there is nothing
+   to poll. The exchange is kept on the workout itself (lib/coach-live.js) and the sheet that shows
+   it reads the store; this only sees the request through, which may outlast the sheet it was
+   typed in: someone asks, closes the sheet and does their set.
+
+   The server gives a question 90 seconds. The request waits a little longer, so that what comes
+   back is the server's answer or its refusal and not this side's own timeout. A request that
+   died on the way (a gym's wifi), or met "still answering", is sent again under the same turn
+   id, which is answered once however often it is asked. */
+export const LIVE_REQUEST_MS = 110000
+const LIVE_RETRY_MS = [2500, 5000, 8000]
+const LIVE_RETRY_WITHIN_MS = 150000
+const asking = new Set()   // turns with a request in flight, in this run of the app
+/** Whether the question sent under `turn` is still on its way. One the app was reloaded under
+ *  is not: its line stays in the workout, and the sheet offers to ask it again. */
+export const isAsking = turn => asking.has(turn)
+// The sheet says when it is on screen, and how to bring it back: an answer that arrives after it
+// was closed is announced, with a way to it.
+let liveSheet = { open: () => false, show: null }
+export function setLiveSheet(hooks) { liveSheet = { ...liveSheet, ...hooks } }
+
+const _askLive = async body => DEMO ? (await demo()).demoLive(S(), body) : LOCAL() ? (await local()).localLive(S(), body) : api('/api/coach/live', { method: 'POST', timeout: LIVE_REQUEST_MS, body: JSON.stringify({ ...body, lang: getLang() }) })
+const classOf = e => e?.data?.code || e?.code || null
+
+async function sendLive(turn, line) {
+  const began = Date.now()
+  for (let i = 0; ; i++) {
+    const A = S().active
+    if (!canAskLive(A)) throw Object.assign(new Error('no workout under way'), { status: 400, code: 'nolive' })
+    // What was said stays here: the thread goes along cut to what the server reads of it.
+    const { coachTalk, ...session } = A
+    try {
+      return await _askLive({ text: line.text, session, focus: Number.isInteger(line.focus) ? line.focus : A.cur, thread: threadFor(A), turnId: turn })
+    } catch (e) {
+      // Worth another try: the last question is still being answered, or the request never got
+      // there or back. A refusal with a reason is the answer.
+      const again = classOf(e) === 'busy' || (!e?.status && classOf(e) !== 'not-paired')
+      if (!again || i >= LIVE_RETRY_MS.length || Date.now() - began > LIVE_RETRY_WITHIN_MS) throw e
+      await new Promise(done => setTimeout(done, LIVE_RETRY_MS[i]))
+    }
+  }
+}
+
+/**
+ * Ask the Coach about the workout under way. `text` is a new question from the exercise at
+ * `focus`; `retry` is the id of one already in the workout that got no answer. The question is
+ * written into the workout first and the answer, or the reason there is none, when it comes;
+ * nothing is returned that the store does not hold.
+ */
+export async function askCoachLive({ text, focus, retry } = {}) {
+  const store = useStore.getState()
+  const active = store.S.active
+  if (!store.ready || !canAskLive(active)) return false
+  const workout = active.id
+  const turn = retry || newTurnId()
+  if (asking.has(turn)) return false
+  asking.add(turn)
+  try {
+    if (!retry) store.update(s => { addQuestion(s.active, { id: turn, text, focus }) })
+    // Asking again takes the old reason away, so the sheet shows the wait and not the failure.
+    else store.update(s => { if (s.active) s.active.coachTalk = talkOf(s.active).filter(m => !(m && m.turn === turn && m.error)) })
+    const line = talkOf(useStore.getState().S.active).find(m => m && m.who === 'user' && m.id === turn)
+    if (!line) return false
+    let answer = null, failure = null
+    try { answer = await sendLive(turn, line) } catch (e) { failure = e }
+    asking.delete(turn)
+    // Written only into the workout it was asked in: one finished or discarded meanwhile is gone.
+    useStore.getState().update(s => {
+      if (!s.active || s.active.id !== workout) return
+      if (answer) addAnswer(s.active, turn, answer)
+      else addFailure(s.active, turn, classOf(failure) || (failure?.status ? 'internal' : 'lost'), LOCAL() ? (failure?.data?.detail || failure?.detail) : null)
+    })
+    if (answer && !liveSheet.open() && useStore.getState().S.active?.id === workout) {
+      useUI.getState().toast(t('The Coach answered.'), liveSheet.show ? { action: t('Show'), onAction: () => liveSheet.show() } : undefined)
+    }
+    return !!answer
+  } finally {
+    asking.delete(turn)
+  }
+}
+
 /* Whose provider account this profile is about to spend. Its own call because the constraint is
    that the Coach screen states it too, not just the admin card — and because in instance mode a
    second profile is refused outright, which is something the user has to be able to read before
@@ -216,6 +299,8 @@ export const JOB_ERRORS = {
   get livecap() { return t('The Coach has answered all it can during workouts today. Try again tomorrow.') },
   get toolarge() { return t('This workout is too large for the Coach to read.') },
   get forgotten() { return t('The Coach was switched off for this profile while it was answering.') },
+  // Not the server's: the request never got there, or its answer never got back.
+  get lost() { return t('No answer came back. Check your connection and ask again.') },
   get internal() { return t('Something went wrong on the server.') }
 }
 

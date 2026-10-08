@@ -31,6 +31,12 @@ import { t, getLang } from './i18n.js'
 
 export const ADAPTERS = { anthropic, openai, gemini, compatible }
 export const LOCAL_DAILY_CAP = 10
+// Questions asked during a workout are counted on their own, as on a server (caps.livePerProfileDaily):
+// a session's worth of them must not use up the runs a review needs.
+export const LOCAL_LIVE_DAILY_CAP = 30
+// What a server gives one of those questions (api/coach/jobs.js): someone is standing at the bar.
+export const LIVE_TIMEOUT_MS = 90000
+const LIVE_MAX_TOKENS = 2000
 // Five minutes is right for a cloud API and wrong for a model on somebody's laptop; the
 // OpenAI-compatible endpoint is the one that may be local, so it gets the long budget.
 export const TIMEOUT_MS = 5 * 60000
@@ -100,6 +106,53 @@ export const localDebrief = (S, workoutId) => start(S, 'debrief', { workoutId: w
 // A look at the running cycle. A phone has no scheduler, so this is the only way one happens
 // here: asked for from the cycle's own screen.
 export const localAdjust = (S, note) => start(S, 'adjust', { note: note ? String(note).slice(0, 1000) : null })
+/* A question asked during a workout, answered in this call rather than by a job the screens poll
+   for (the server's liveTurn, api/coach/jobs.js). It does not wait behind a running job, it is
+   counted against a cap of its own, and one is answered at a time. Refusals carry the server's
+   classes, so the sheet words them the same way. */
+let liveBusy = false
+const refuse = (status, code, detail) => Object.assign(new Error(code), { status, code, ...(detail ? { detail } : {}) })
+async function liveCapState() {
+  const d = await loadCoachDevice()
+  const used = d.liveDaily && d.liveDaily.d === todayISO() ? d.liveDaily.n : 0
+  return { used, limit: LOCAL_LIVE_DAILY_CAP }
+}
+export async function localLive(S, body = {}) {
+  if (liveBusy) throw refuse(409, 'busy')
+  // Taken before the first await: two questions sent in the same moment would both read the
+  // device file while neither had been counted.
+  liveBusy = true
+  try {
+    if (!S?.coach?.consent?.agreedAt) throw refuse(403, 'consent')
+    const d = await loadCoachDevice()
+    const adapter = ADAPTERS[d.provider]
+    if (d.mode !== 'byok' || !adapter) throw refuse(503, 'off')
+    const text = typeof body.text === 'string' ? body.text.trim().slice(0, 1000) : ''
+    if (!text) throw refuse(400, 'empty')
+    const live = payloadLib.liveContext(S, body.session)
+    if (!live) throw refuse(400, 'nolive')
+    const cap = await liveCapState()
+    if (cap.used >= cap.limit) throw refuse(429, 'livecap')
+    const payload = payloadLib.build(S, { handle: await handle(), kind: 'live', live: body.session, focus: body.focus, thread: body.thread, note: text, lang: getLang() })
+    if (JSON.stringify(payload).length > payloadLib.MAX_PAYLOAD_CHARS) throw refuse(413, 'toolarge')
+    // Counted when the call is about to be made, as a job is when it starts.
+    await saveCoachDevice({ liveDaily: { d: todayISO(), n: cap.used + 1 } })
+    const key = await getApiKey()
+    const attempt = await runPipeline({
+      adapter, cfg: cfgOf(d), kind: 'live', payload, live,
+      model: d.model || HTTP_PROVIDERS[d.provider].defaultModel, timeoutMs: LIVE_TIMEOUT_MS,
+      invokeOpts: { env: envOf(d, key), fetch: nativeFetch, maxTokens: LIVE_MAX_TOKENS }
+    })
+    if (!attempt.ok) {
+      // The provider's own words, or the validator's: on a phone the person asking is the operator.
+      const detail = attempt.detail || (Array.isArray(attempt.errors) && attempt.errors.length ? attempt.errors.slice(0, 3).map(String).join(' · ').slice(0, 300) : null)
+      throw refuse(attempt.errorClass === 'timeout' ? 504 : 502, attempt.errorClass || 'internal', detail)
+    }
+    return { id: 'local-' + Date.now().toString(36), ...attempt.result, cap: { used: cap.used + 1, limit: cap.limit } }
+  } finally {
+    liveBusy = false
+  }
+}
 /** The looks the app has applied are no longer held for it. */
 export async function localLooksTaken(ids) {
   const d = await loadCoachDevice()
@@ -216,4 +269,4 @@ function workoutMetaOf(S, workoutId) {
 }
 
 // Test seam.
-export function _resetLocal() { job = null; lastError = null; last = null }
+export function _resetLocal() { job = null; lastError = null; last = null; liveBusy = false }

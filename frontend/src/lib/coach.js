@@ -71,7 +71,7 @@ export const coachAvailable = (config, user, { demo, mobile, coachMode } = {}) =
 // builder uses (api/coach/core/categories.js), so the screen cannot promise less than leaves.
 export const CATEGORY_TEXT = {
   plan: ['Your plan', 'Routines, exercises, sets and reps, your weekly schedule and progression settings.'],
-  training: ['Your logged training', 'Sets you logged in the review window: weights, reps, times, effort ratings, how long sessions took, your session notes, and the marks and notes you put on exercises.'],
+  training: ['Your logged training', 'Sets you logged in the review window: weights, reps, times, effort ratings, how long sessions took, your session notes, and the marks and notes you put on exercises. A question asked during a workout sends that workout as it stands.'],
   bodyweight: ['Body weight', 'Weigh-ins from the same window, and your goal weight if you set one.'],
   profile: ['What you tell the Coach', 'Your intake answers, including any limitations or injuries you describe.'],
   prefs: ['A few preferences', 'Your unit, your language and which effort scale you log.']
